@@ -1,0 +1,1 @@
+Implement the fixed-timing push-to-talk state machine with interruption and no self-echo.

@@ -9,6 +9,16 @@ function Get-JarvisCrew {
     )
 }
 
+function Get-JarvisStepDefinitions {
+    $agentSteps = @(4, 6, 13, 14, 19, 20, 21, 22, 23, 26, 29, 30, 31, 32, 33, 34, 35, 38, 40, 42, 43)
+    $definitions = @()
+    foreach ($number in 1..48) {
+        $kind = if ($agentSteps -contains $number) { 'agent-or-deterministic' } elseif ($number -in @(7,10,24,28,36,37,41,44)) { 'interactive' } else { 'deterministic' }
+        $definitions += [pscustomobject]@{ Number = $number; Kind = $kind; PreCheck = "Test-JarvisStepPreCheck $number"; Action = "Invoke-JarvisStepAction $number"; PostCheck = "Test-JarvisStepPostCheck $number" }
+    }
+    $definitions
+}
+
 function Assert-JarvisUploadName {
     param([string]$Name)
     if ([string]::IsNullOrWhiteSpace($Name) -or $Name -match '[\\/]' -or $Name -match '\.\.') { throw 'Invalid upload filename' }

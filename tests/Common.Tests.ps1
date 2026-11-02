@@ -1,5 +1,6 @@
 $module = Join-Path $PSScriptRoot '..\installer\lib\common.psm1'
 Import-Module $module -Force
+Import-Module (Join-Path $PSScriptRoot '..\installer\lib\identity.psm1') -Force
 
 Describe 'JARVIS installer common safeguards' {
     It 'derives all runtime paths from a supplied Hermes home' {
@@ -33,6 +34,13 @@ Describe 'JARVIS installer common safeguards' {
         $progress = Get-Content $file -Raw | ConvertFrom-Json
         (@($progress.completed) -contains 3) | Should Be $true
         $progress.current | Should Be 4
+    }
+
+    It 'writes a valid memory entry when the memory file is empty' {
+        $file = Join-Path $TestDrive 'empty-memory.md'
+        New-Item -ItemType File -Path $file | Out-Null
+        Write-JarvisMemoryEntry -MemoryFile $file -Entry 'new entry'
+        (Get-Content -LiteralPath $file -Raw).Trim() | Should Match 'new entry'
     }
 
 }

@@ -1,0 +1,1 @@
+Implement explicit-send chat history using profile-scoped hermes -z and activity logging. Page load must never send a turn.

@@ -33,7 +33,8 @@ function Invoke-Undo {
 }
 if ($Uninstall) { Invoke-Undo; exit 0 }
 
-$form = if (Test-Path $inputPath) { Get-Content $inputPath -Raw | ConvertFrom-Json } else { Read-JarvisOwnerForm -SkipPrompt:$DryRun }
+$savedForm = if (Test-Path $inputPath) { Get-Content $inputPath -Raw | ConvertFrom-Json } else { $null }
+$form = Complete-JarvisOwnerForm -Form $savedForm -EnvFile (Join-Path $paths.HermesHome '.env') -DryRun:$DryRun
 if (-not $DryRun -and -not (Test-JarvisOwnerForm -Form $form)) { throw 'Owner form is incomplete. Re-run interactively and provide all six interview answers before installation.' }
 if (-not (Test-Path $inputPath)) { Save-Inputs $form }
 $progress = Get-JarvisProgress $progressPath
@@ -44,6 +45,7 @@ $end = if ($Step) { $Step } else { 44 }
 for ($n = $start; $n -le $end; $n++) {
     if (@($progress.completed) -contains $n) { continue }
     Show-Action "Step $n pre-check"
+    if (-not (Test-JarvisStepPreCheck -Number $n -Paths $paths -DryRun:$DryRun)) { throw "Step $n pre-check failed." }
     if ($n -eq 15) {
         if (-not (Test-JarvisPortFree -Port 8899)) { throw 'Port 8899 must be free before dashboard installation.' }
         if (-not $DryRun -and -not (Test-JarvisRequiredProcesses)) { throw 'Paperclip, Postgres, and Ollama must remain running during installation.' }
@@ -52,9 +54,9 @@ for ($n = $start; $n -le $end; $n++) {
         1 { if (-not $DryRun) { foreach ($f in @('USER.md','MEMORY.md')) { Backup-JarvisFile (Join-Path $paths.HermesHome "memories\$f") (Join-Path $paths.StateRoot 'backups') -UndoPath $undoPath | Out-Null }; Write-JarvisMemoryEntry (Join-Path $paths.HermesHome 'memories\USER.md') "$($form.name) works as: $($form.work). Time zone: $($form.timezone). Hours: $($form.hours). Weather city: $($form.weather_city)."; Write-JarvisMemoryEntry (Join-Path $paths.HermesHome 'memories\MEMORY.md') "JARVIS is chief of staff. Top priority: $($form.priority)." } }
         2 { if (-not $DryRun) { Backup-JarvisFile (Join-Path $paths.HermesHome 'memories\USER.md') (Join-Path $paths.StateRoot 'backups') -UndoPath $undoPath | Out-Null; Write-JarvisMemoryEntry (Join-Path $paths.HermesHome 'memories\USER.md') "Interview answers: $($form.interview -join ' | ')" } }
         3 { if (-not $DryRun) { Backup-JarvisFile (Join-Path $paths.HermesHome 'memories\MEMORY.md') (Join-Path $paths.StateRoot 'backups') -UndoPath $undoPath | Out-Null; Write-JarvisMemoryEntry (Join-Path $paths.HermesHome 'memories\MEMORY.md') (Get-Content (Join-Path $root 'templates\memory-rules.md') -Raw) } }
-        4 { Show-Action 'Run prompts/04-plan-crew.txt as default profile' }
+        4 { Invoke-JarvisStepAction -Number 4 -Paths $paths -Root $root -Form $form -DryRun:$DryRun }
         5 { Install-JarvisCrew $paths.HermesHome (Join-Path $root 'templates') $form.name -DryRun:$DryRun }
-        6 { Show-Action 'Distribute owner brief and role boundaries to all four profiles' }
+        6 { Invoke-JarvisStepAction -Number 6 -Paths $paths -Root $root -Form $form -DryRun:$DryRun }
         7 {
             if (-not $DryRun) {
                 $token = Get-JarvisEnvValue (Join-Path $paths.HermesHome '.env') 'TELEGRAM_BOT_TOKEN'
@@ -86,28 +88,35 @@ for ($n = $start; $n -le $end; $n++) {
                 & hermes gateway restart | Out-Null
             } else { Show-Action 'Install and enable telegram_topic_profiles; set multiplexing; restart gateway' }
         }
-        10 { Show-Action 'Owner first-words test in four Telegram topics' }
+        10 { Invoke-JarvisStepAction -Number 10 -Paths $paths -Root $root -Form $form -DryRun:$DryRun }
         11 { if (-not $DryRun) { New-Item -ItemType Directory -Force -Path $paths.ProjectRoot | Out-Null; Initialize-JarvisActivityLog $logPath } }
         12 { if (-not $DryRun) { foreach ($agent in @('JARVIS','DEV','RESEARCH','ASSISTANT')) { Add-JarvisActivity $logPath $agent 'installer smoke test' 'completed' 'gpt-oss:20b' } } }
-        13 { if ($WithClaudeCode) { Show-Action 'Run prompts/13-claude-orientation.txt' } else { Show-Action 'Claude Code skipped' } }
-        14 { Show-Action 'Run read-only Hermes data survey' }
+        13 { if ($WithClaudeCode) { Invoke-JarvisStepAction -Number 13 -Paths $paths -Root $root -Form $form -DryRun:$DryRun } else { Show-Action 'Claude Code skipped by switch' } }
+        14 { Invoke-JarvisStepAction -Number 14 -Paths $paths -Root $root -Form $form -DryRun:$DryRun }
         15 { if (-not $DryRun) { Install-JarvisDashboardFiles $paths.ProjectRoot (Join-Path $root 'dashboard'); Register-JarvisDashboardTask $paths.ProjectRoot } }
-        16 { Show-Action 'Dashboard upload route is available at /upload' }
-        17 { Show-Action 'Original split dashboard assets installed' }
+        16 { Invoke-JarvisStepAction -Number 16 -Paths $paths -Root $root -Form $form -DryRun:$DryRun }
+        17 { Invoke-JarvisStepAction -Number 17 -Paths $paths -Root $root -Form $form -DryRun:$DryRun }
         18 { if (-not $DryRun) { Copy-Item (Join-Path $root 'dashboard\jarvis-backup.ps1') (Join-Path $paths.ProjectRoot 'jarvis-backup.ps1') -Force } }
-        23 { if (-not $DryRun) { Install-JarvisComms $paths.ProjectRoot } }
-        24 { if ($WithSerpApi) { Show-Action 'Prompt for masked SerpApi key and store locally' } }
+        23 { if (-not $DryRun) { Install-JarvisComms $paths.ProjectRoot }; Invoke-JarvisStepAction -Number 23 -Paths $paths -Root $root -Form $form -DryRun:$DryRun }
+        24 { if ($WithSerpApi) { Invoke-JarvisStepAction -Number 24 -Paths $paths -Root $root -Form $form -DryRun:$DryRun } else { Show-Action 'SerpApi skipped by switch' } }
         25 { if ($WithSerpApi -and -not $DryRun) { Install-JarvisResearch $paths.ProjectRoot (Join-Path $paths.HermesHome 'profiles\research') -WithSerpApi } }
         27 { if (-not $DryRun) { $voice = Install-JarvisVoiceRuntime $paths.VoiceRoot (Join-Path $paths.StateRoot 'voice-runtime.json') (Join-Path $root 'voice\voice-server.py'); Register-JarvisVoiceTask $paths.VoiceRoot $voice.Executable } else { Show-Action 'Create Kokoro venv with py -3.12 and record exact interpreter' } }
-        28 { if ($WithElevenLabs) { Show-Action 'Prompt for masked ElevenLabs key and store locally' } }
-        36 { if ($WithComposio) { Show-Action 'Install Composio and pause for browser OAuth links' } }
-        38 { if (-not $DryRun) { Write-JarvisBriefingConfig (Join-Path $paths.ProjectRoot 'briefing.json') $form.weather_city } }
+        28 { if ($WithElevenLabs) { Invoke-JarvisStepAction -Number 28 -Paths $paths -Root $root -Form $form -DryRun:$DryRun } else { Show-Action 'ElevenLabs skipped by switch' } }
+        36 { if ($WithComposio) { Invoke-JarvisStepAction -Number 36 -Paths $paths -Root $root -Form $form -DryRun:$DryRun } else { Show-Action 'Composio skipped by switch' } }
+        38 { if (-not $DryRun) { Write-JarvisBriefingConfig (Join-Path $paths.ProjectRoot 'briefing.json') $form.weather_city }; Invoke-JarvisStepAction -Number 38 -Paths $paths -Root $root -Form $form -DryRun:$DryRun }
         41 { if ($WithTailscale -and -not $DryRun) { Install-JarvisAccess $paths.ProjectRoot -WithTailscale } }
-        43 { if (-not $DryRun) { Test-JarvisInstall $paths.ProjectRoot $paths.HermesHome | ConvertTo-Json | Set-Content (Join-Path $paths.StateRoot 'verification.json') } }
-        44 { if ($WithHomeAssistant) { Show-Action 'Install loopback Home Assistant and pause for browser onboarding' } }
-        default { Show-Action "Step $n action recorded; agent-driven or optional work is handled by its prompt/module." }
+        43 { if (-not $DryRun) { Test-JarvisInstall $paths.ProjectRoot $paths.HermesHome | ConvertTo-Json | Set-Content (Join-Path $paths.StateRoot 'verification.json') }; Invoke-JarvisStepAction -Number 43 -Paths $paths -Root $root -Form $form -DryRun:$DryRun }
+        44 { if ($WithHomeAssistant) { Invoke-JarvisStepAction -Number 44 -Paths $paths -Root $root -Form $form -DryRun:$DryRun } else { Show-Action 'Home Assistant skipped by switch' } }
+        default { Invoke-JarvisStepAction -Number $n -Paths $paths -Root $root -Form $form -DryRun:$DryRun -WithSerpApi:$WithSerpApi -WithElevenLabs:$WithElevenLabs -WithComposio:$WithComposio -WithTailscale:$WithTailscale -WithHomeAssistant:$WithHomeAssistant -WithClaudeCode:$WithClaudeCode }
     }
-    Show-Action "Step $n post-check"
+    $markerPath = Join-Path $paths.ProjectRoot ("state\step-{0:D2}.json" -f $n)
+    if (-not $DryRun -and -not (Test-Path -LiteralPath $markerPath)) {
+        New-Item -ItemType Directory -Force -Path (Split-Path $markerPath -Parent) | Out-Null
+        [ordered]@{ step = $n; action = 'completed'; created_at = [DateTime]::UtcNow.ToString('o') } | ConvertTo-Json | Set-Content -LiteralPath $markerPath -Encoding UTF8
+    }
+    $postPassed = Test-JarvisStepPostCheck -Number $n -Paths $paths -Root $root -DryRun:$DryRun
+    if (-not $postPassed) { throw "Step $n post-check failed; progress was not advanced." }
+    Show-Action "Step $n post-check passed"
     if (-not $DryRun) { Save-JarvisProgress -Path $progressPath -Completed (@($progress.completed) + @($n)) -Current ($n + 1); $progress = Get-JarvisProgress $progressPath }
 }
 Write-Output "JARVIS installer run complete through step $end."

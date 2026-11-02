@@ -5,13 +5,13 @@ function Get-JarvisPaths {
         [string]$HermesHome = $(if ($env:HERMES_HOME) { $env:HERMES_HOME } else { Join-Path $env:LOCALAPPDATA 'hermes' }),
         [string]$StateRoot = $(Join-Path $PSScriptRoot '..\state')
     )
-    $home = [IO.Path]::GetFullPath($HermesHome)
+    $hermesRoot = [IO.Path]::GetFullPath($HermesHome)
     $state = [IO.Path]::GetFullPath($StateRoot)
     [pscustomobject]@{
-        HermesHome = $home
+        HermesHome = $hermesRoot
         StateRoot = $state
-        BackupRoot = Join-Path (Split-Path $home -Parent) 'jarvis-mission-control-backups'
-        ProjectRoot = Join-Path (Split-Path $home -Parent) 'jarvis-mission-control'
+        BackupRoot = Join-Path (Split-Path $hermesRoot -Parent) 'jarvis-mission-control-backups'
+        ProjectRoot = Join-Path (Split-Path $hermesRoot -Parent) 'jarvis-mission-control'
         SecretsRoot = Join-Path $env:LOCALAPPDATA 'jarvis-secrets'
         VoiceRoot = Join-Path $env:LOCALAPPDATA 'jarvis-voice'
     }

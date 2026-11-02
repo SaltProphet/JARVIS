@@ -16,6 +16,22 @@ function Invoke-JarvisTelegramApi {
     $response.result
 }
 
+function Find-JarvisTelegramGroup {
+    param([object[]]$Updates)
+    foreach ($update in @($Updates | Sort-Object update_id -Descending)) {
+        $chat = if ($update.message) { $update.message.chat } elseif ($update.channel_post) { $update.channel_post.chat } else { $null }
+        if ($chat -and $chat.type -in @('group','supergroup')) {
+            return [pscustomobject]@{ id = [string]$chat.id; title = [string]$chat.title; type = [string]$chat.type }
+        }
+    }
+    $null
+}
+
+function Get-JarvisTelegramGroupFromUpdates {
+    param([string]$Token)
+    Find-JarvisTelegramGroup -Updates @(Invoke-JarvisTelegramApi $Token 'getUpdates')
+}
+
 function New-JarvisTelegramTopics {
     param([string]$Token, [string]$ChatId)
     $member = Invoke-JarvisTelegramApi $Token 'getChatMember' @{ chat_id = $ChatId; user_id = (Invoke-JarvisTelegramApi $Token 'getMe').id }

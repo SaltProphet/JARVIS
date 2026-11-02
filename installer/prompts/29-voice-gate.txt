@@ -1,0 +1,1 @@
+Verify Kokoro health and synthesis, then record works, skipped, or failed without allowing failed voice setup to continue.

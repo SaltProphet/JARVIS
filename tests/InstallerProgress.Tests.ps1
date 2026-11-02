@@ -5,7 +5,7 @@ Describe 'Installer progress with a fake Hermes home' {
         New-Item -ItemType Directory -Force -Path (Join-Path $fakeHermes 'memories') | Out-Null
         New-Item -ItemType Directory -Force -Path $fakeState | Out-Null
         $inputs = [ordered]@{
-            name = 'Owner'; work = 'work'; timezone = 'UTC'; hours = '9-5'; weather_city = 'City'; priority = 'priority'
+            name = 'Owner'; work = 'work'; timezone = 'UTC'; hours = '9-5'; weather_city = 'City'; priority = 'priority'; telegram_chat_id = '-100'
             interview = @('a','b','c','d','e','f')
         }
         $oldHermes = $env:HERMES_HOME

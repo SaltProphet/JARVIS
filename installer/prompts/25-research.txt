@@ -1,0 +1,1 @@
+Install the research-only SerpApi skill with citations, allowlisted access, and activity logging.

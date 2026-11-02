@@ -1,0 +1,1 @@
+Implement append-only dictation pauses, send clearing, and upload fallback.

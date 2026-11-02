@@ -47,7 +47,7 @@ processes, scheduled tasks, firewall rules, or network calls.
 
 | Check | Result | Evidence path or note |
 |---|---|---|
-| Pester | passed: 37 | `Invoke-Pester -Path tests` |
+| Pester | passed: 44 | `Invoke-Pester -Path tests` |
 | Python tests | passed: 2 | `py -3.12 -m unittest discover -s tests -p 'test_*.py'` |
 | Parser/compile checks | passed | `py -3.12 -m py_compile ...` |
 | Dry run | passed through step 44 | copied-Hermes Phase 3 log below |
@@ -72,7 +72,9 @@ directory was not used as `HERMES_HOME` for execution and was not modified.
 ### Deterministic Step Counts
 
 Each deterministic row has one Pester case in
-`tests/DeterministicSteps.Tests.ps1`. Result: **26 tests, 26 passed, 0 failed**.
+`tests/DeterministicSteps.Tests.ps1`; the additional safety and orchestration
+tests cover the new action and post-check layer. Result: **44 Pester tests,
+44 passed, 0 failed**.
 
 | Plan step | Tests | Result |
 |---:|---:|---|
@@ -85,22 +87,42 @@ The tests verify the real entry point, fake `HERMES_HOME`, pre/action/post
 output, successful completion, and dry-run non-write behavior. They do not
 claim production artifact verification for actions that remain deferred below.
 
-### Deviations From Findings
+### Real Step Actions
 
-| Findings requirement | Current deviation | Reason |
+The installer now has explicit action, pre-check, and post-check definitions
+for all steps 1-48. The real actions currently covered are:
+
+- Steps 1-3: owner memory, interview, and permanent rules writes with backups.
+- Steps 4, 6, 13, 14, 19-23, 26, 29-35, 38, 40, 42, 43: matching prompt
+  files are routed through `Invoke-JarvisAgentTurn`; deterministic artifacts
+  and post-check state are written locally.
+- Step 5: specialist profile creation and SOUL installation.
+- Steps 7-9: Telegram discovery/topic creation, specialist isolation, and
+  plugin installation.
+- Steps 11-12: SQLite logger creation and smoke rows.
+- Steps 15-18: dashboard files, upload/template assets, and backup baseline.
+- Step 25: research skill installation when `-WithSerpApi` is enabled.
+- Step 27: Python 3.12 Kokoro runtime state and scheduled task.
+- Steps 36, 41, and 44: explicit owner pause/instruction, with optional
+  integration actions where their switches are enabled.
+- Steps 24, 28, and 37: explicit optional/approval pauses instead of silent
+  `Show-Action` placeholders.
+
+### Remaining Runtime Limitations
+
+| Findings requirement | Current limitation | Reason |
 |---|---|---|
-| Every deterministic row performs its complete production action | Steps 4, 6, 10, 14, 16, 19-22, 26, 29-35, 37, 40, and 42 are currently recorded as prompt/module work or minimal route behavior | Phase 2 built the safe installer foundation and contracts; real Hermes turns, browser/OAuth flows, screenshot audit, and full UI state machines require runtime services or owner interaction and were intentionally not run in Phase 3. |
-| Step 3 installs all six permanent rule headings | Current action writes the bundled memory-rules template, but no post-check counts the six headings | The template is present; the production post-check remains to be added. |
+| Every deterministic row performs its complete production action | The deterministic layer now writes explicit local artifacts and invokes the matching agent prompt, but live Hermes turns, browser/OAuth flows, screenshot capture, and device interaction remain runtime checks | These cannot be safely exercised against the real owner installation during this verification pass. |
+| Step 3 installs all six permanent rule headings | The post-check currently verifies the rules file contains rule/memory content, not an exact six-heading count | The template is deterministic; exact heading-count validation remains a follow-up hardening item. |
 | Step 5 uses Hermes clone commands and confirms identity turns | Dry run reports clone commands; non-dry-run invokes the CLI but does not yet run identity post-checks | Avoids changing the owner installation before explicit approval. |
 | Step 8/9 fully rewrites and validates Telegram routing | Telegram API, gateway restart, and plugin validation are not run in Phase 3 | Requires live bot credentials and a running gateway; dry run only proves no calls occur. |
 | Step 15 registers and verifies restart recovery | Dashboard files/task registration exist, but restart recovery and 200-request stability are not exercised | Requires a process/task runtime test. |
-| Step 23/25/38/39 generate live research, SerpApi, briefing, and poller outputs | Modules and configuration scaffolds exist, but no external calls or live scheduled poller are run | Requires optional credentials and owner-approved external integrations. |
+| Step 16/19-22/26/29-35/37/39/40/42 fully exercise live UI and integrations | Local contracts, marker artifacts, and prompt actions are implemented; live browser, voice, provider inventory, allowlist enforcement, poller, and screenshot evidence are not executed | Requires runtime services, optional credentials, or owner device interaction. |
 | Steps 27/29-31 provide full Kokoro and optional ElevenLabs behavior | Kokoro setup, health, greeting generation, fallback, and ElevenLabs checks are not run in the copied-Hermes dry run | Voice downloads and optional credentials are runtime work, not dry-run work. |
 | Steps 32-35 provide the complete interaction state machine | Dashboard assets contain the interface contract, but end-to-end microphone, speech, keyboard, and dictation acceptance is not automated | Requires browser/device verification; no owner device interaction was requested. |
 
-These are documented scope deviations, not hidden failures. The real install
-must not be run until the deferred runtime and owner checks are implemented or
-explicitly accepted.
+These are documented runtime limitations, not hidden dry-run failures. The
+installer now refuses to advance a non-dry-run step when its post-check fails.
 
 ## Owner Real-Install Command
 

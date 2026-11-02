@@ -1,0 +1,1 @@
+Wire the four-agent roster, dossier, heatmap, scoped feed, and real observed agent status.

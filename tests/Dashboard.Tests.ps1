@@ -13,4 +13,14 @@ Describe 'Dashboard contract helpers' {
         { Assert-JarvisUploadName -Name 'payload.exe' } | Should Throw
         Assert-JarvisUploadName -Name 'jarvis-dashboard-template.html' | Should Be $true
     }
+
+    It 'defines a real action and post-check for every installer step' {
+        $definitions = Get-JarvisStepDefinitions
+        @($definitions).Count | Should Be 48
+        foreach ($definition in $definitions) {
+            $definition.Action | Should Not BeNullOrEmpty
+            $definition.PreCheck | Should Not BeNullOrEmpty
+            $definition.PostCheck | Should Not BeNullOrEmpty
+        }
+    }
 }

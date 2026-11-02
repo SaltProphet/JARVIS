@@ -1,0 +1,1 @@
+Implement brief trigger phrases, owner-form weather city lookup, and a three-sentence spoken format.

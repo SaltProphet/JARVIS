@@ -1,0 +1,1 @@
+Wire the Home state, rolling events, SSE stream, honest empty states, and version badge. Use observed Hermes data only; never invent activity.
