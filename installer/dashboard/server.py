@@ -10,6 +10,7 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.request
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -21,6 +22,7 @@ HOST = "127.0.0.1"
 PORT = int(os.environ.get("JARVIS_DASHBOARD_PORT", "8899"))
 LOG_DB = Path(os.environ.get("AGENT_LOG_DB", ROOT / "agent-logs.db")).resolve()
 VERSION = os.environ.get("JARVIS_VERSION", "v0.1")
+VOICE_CONFIG = ROOT / "voice-config.json"
 EVENTS = ("state",)
 CREW = [
     {"key": "default", "name": "JARVIS", "code": "J-00", "initials": "JV", "role": "Chief of staff", "tagline": "Routes, verifies, reports"},
@@ -54,6 +56,26 @@ def shelves() -> dict:
         total += len(docs)
         result.append({"agent": agent["key"], "count": len(docs), "docs": docs})
     return {"total": total, "shelves": result}
+
+def read_cron_jobs() -> list[dict]:
+    path = HERMES / "cron" / "jobs.json"
+    if not path.is_file():
+        return []
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        return payload if isinstance(payload, list) else payload.get("jobs", [])
+    except (OSError, ValueError):
+        return []
+
+def read_voice_config() -> dict:
+    default = {"scenario": 1, "el_key_present": False, "el_voice": None, "el_voice_name": None}
+    try:
+        if VOICE_CONFIG.is_file():
+            value = json.loads(VOICE_CONFIG.read_text(encoding="utf-8"))
+            default.update(value)
+    except (OSError, ValueError):
+        pass
+    return default
 
 def state() -> dict:
     rows = db_rows()
@@ -102,6 +124,9 @@ class Handler(BaseHTTPRequestHandler):
             if user.exists(): first = user.read_text(encoding="utf-8", errors="replace").split()[0] if user.read_text(encoding="utf-8", errors="replace").split() else ""
             return json_response(self, {"name": first if first.isalpha() else ""})
         if path == "/api/models": return json_response(self, {"agents": [{**a, "model": None, "provider": "custom"} for a in CREW], "providers": [{"slug": "custom", "name": "Custom", "models": ["gpt-oss:20b"], "total": 1}], "loading": False, "error": None})
+        if path == "/api/chat/history": return json_response(self, {"session": None, "telegram": False, "messages": []})
+        if path == "/api/cron": return json_response(self, {"jobs": read_cron_jobs()})
+        if path == "/api/voice/config": return json_response(self, read_voice_config())
         if path == "/docs.md": return self.send_file(ROOT / "docs.md", "text/markdown; charset=utf-8")
         if path in ("/", "/template", "/styles.css", "/script.js", "/favicon.svg", "/upload"):
             file = {"/": "index.html", "/template": "jarvis-dashboard-template.html", "/upload": "upload.html"}.get(path, path.lstrip("/"))
@@ -131,8 +156,49 @@ class Handler(BaseHTTPRequestHandler):
                 result = subprocess.run(cmd, capture_output=True, text=True, timeout=300, env={**os.environ, "HERMES_HOME": str(HERMES)})
                 return json_response(self, result.stdout.strip() if result.returncode == 0 else result.stderr.strip(), 200 if result.returncode == 0 else 502, "text/plain; charset=utf-8")
             except Exception as exc: return json_response(self, {"error": str(exc)}, 502)
-        if parsed.path == "/api/models/set": return json_response(self, {"ok": False, "error": "model editing is enabled by the installer module"}, 501)
-        if parsed.path == "/api/voice/config": return json_response(self, {"scenario": 1, "el_key_present": False, "el_voice": None, "el_voice_name": None})
+        if parsed.path == "/api/models/set":
+            try:
+                payload = json.loads(raw); agent = payload["agent"]; model = payload["model"]; provider = payload["provider"]
+                target = HERMES / "config.yaml" if agent == "default" else HERMES / "profiles" / agent / "config.yaml"
+                if agent not in {a["key"] for a in CREW} or not target.is_file(): raise ValueError("unknown agent")
+                lines = target.read_text(encoding="utf-8").splitlines()
+                output, in_model = [], False
+                for line in lines:
+                    if line == "model:": in_model = True
+                    elif in_model and line and not line.startswith(" "): in_model = False
+                    if in_model and line.startswith("  default:"): line = f'  default: "{model}"'
+                    if in_model and line.startswith("  provider:"): line = f'  provider: "{provider}"'
+                    output.append(line)
+                tmp = target.with_suffix(".yaml.tmp"); tmp.write_text("\n".join(output) + "\n", encoding="utf-8"); tmp.replace(target)
+                return json_response(self, {"ok": True})
+            except Exception as exc: return json_response(self, {"ok": False, "error": str(exc)}, 400)
+        if parsed.path == "/api/cron/action":
+            action = parse_qs(parsed.query).get("action", [""])[0]; job_id = parse_qs(parsed.query).get("id", [""])[0]
+            commands = {"run": "run", "pause": "pause", "resume": "resume", "delete": "remove"}
+            if action not in commands or not job_id: return json_response(self, {"ok": False, "error": "invalid action"}, 400)
+            result = subprocess.run(["hermes", "cron", commands[action], job_id], capture_output=True, text=True, env={**os.environ, "HERMES_HOME": str(HERMES)})
+            return json_response(self, {"ok": result.returncode == 0, "error": result.stderr.strip() if result.returncode else None}, 200 if result.returncode == 0 else 502)
+        if parsed.path == "/api/content/delete":
+            query = parse_qs(parsed.query); agent, file = query.get("agent", [""])[0], query.get("file", [""])[0]
+            if "/" in file or ".." in file: return json_response(self, {"error": "not found"}, 404)
+            target = ROOT / "content" / agent / file
+            if not target.is_file(): return json_response(self, {"error": "not found"}, 404)
+            target.unlink(); return json_response(self, {"ok": True})
+        if parsed.path == "/api/voice/config":
+            try:
+                value = json.loads(raw); scenario = int(value["scenario"])
+                if scenario not in (1, 2, 3): raise ValueError("scenario must be 1, 2, or 3")
+                VOICE_CONFIG.write_text(json.dumps({**read_voice_config(), "scenario": scenario}), encoding="utf-8")
+                return json_response(self, read_voice_config())
+            except Exception as exc: return json_response(self, {"error": str(exc)}, 400)
+        if parsed.path == "/api/voice":
+            try:
+                payload = json.loads(raw); request = urllib.request.Request("http://127.0.0.1:8767/say?voice=bm_daniel", data=str(payload.get("text", "")).encode(), method="POST")
+                with urllib.request.urlopen(request, timeout=60) as response: audio = response.read()
+                self.send_response(200); self.send_header("Content-Type", "audio/wav"); self.send_header("X-Jarvis-Voice-Engine", "kokoro"); self.send_header("Content-Length", str(len(audio))); self.end_headers(); self.wfile.write(audio); return
+            except Exception as exc: return json_response(self, {"error": str(exc)}, 502)
+        if parsed.path == "/api/greeting": return json_response(self, {"error": "greeting cache is not generated"}, 404)
+        if parsed.path == "/api/transcribe": return json_response(self, {"error": "ElevenLabs transcription is not enabled"}, 501)
         return json_response(self, {"error": "not found"}, 404)
 
 if __name__ == "__main__":
