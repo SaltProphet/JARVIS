@@ -18,6 +18,20 @@ function Read-JarvisOwnerForm {
     [pscustomobject]$answers
 }
 
+function Test-JarvisOwnerForm {
+    param([psobject]$Form)
+    if ($null -eq $Form) { return $false }
+    foreach ($field in @('name','work','timezone','hours','weather_city','priority')) {
+        if ([string]::IsNullOrWhiteSpace([string]$Form.$field)) { return $false }
+    }
+    $answers = @($Form.interview)
+    if ($answers.Count -ne 6) { return $false }
+    foreach ($answer in $answers) {
+        if ([string]::IsNullOrWhiteSpace([string]$answer)) { return $false }
+    }
+    $true
+}
+
 function Write-JarvisMemoryEntry {
     param([string]$MemoryFile, [string]$Entry)
     New-Item -ItemType Directory -Force -Path (Split-Path $MemoryFile -Parent) | Out-Null

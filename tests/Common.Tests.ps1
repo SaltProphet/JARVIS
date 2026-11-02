@@ -34,4 +34,5 @@ Describe 'JARVIS installer common safeguards' {
         (@($progress.completed) -contains 3) | Should Be $true
         $progress.current | Should Be 4
     }
+
 }

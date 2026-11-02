@@ -15,7 +15,8 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $lib = Join-Path $root 'lib'
 Get-ChildItem $lib -Filter '*.psm1' | ForEach-Object { Import-Module $_.FullName -Force }
-$paths = Get-JarvisPaths -StateRoot (Join-Path $root 'state')
+$stateRoot = if ($env:JARVIS_STATE_ROOT) { $env:JARVIS_STATE_ROOT } else { Join-Path $root 'state' }
+$paths = Get-JarvisPaths -StateRoot $stateRoot
 $progressPath = Join-Path $paths.StateRoot 'progress.json'
 $undoPath = Join-Path $paths.StateRoot 'undo.ps1'
 $inputPath = Join-Path $paths.StateRoot 'inputs.json'
@@ -33,6 +34,7 @@ function Invoke-Undo {
 if ($Uninstall) { Invoke-Undo; exit 0 }
 
 $form = if (Test-Path $inputPath) { Get-Content $inputPath -Raw | ConvertFrom-Json } else { Read-JarvisOwnerForm -SkipPrompt:$DryRun }
+if (-not $DryRun -and -not (Test-JarvisOwnerForm -Form $form)) { throw 'Owner form is incomplete. Re-run interactively and provide all six interview answers before installation.' }
 if (-not (Test-Path $inputPath)) { Save-Inputs $form }
 $progress = Get-JarvisProgress $progressPath
 $first = if ($progress.completed) { ($progress.completed | ForEach-Object {[int]$_} | Measure-Object -Maximum).Maximum + 1 } else { 1 }
@@ -106,6 +108,6 @@ for ($n = $start; $n -le $end; $n++) {
         default { Show-Action "Step $n action recorded; agent-driven or optional work is handled by its prompt/module." }
     }
     Show-Action "Step $n post-check"
-    if (-not $DryRun) { Save-JarvisProgress -Path $progressPath -Completed @($progress.completed, $n) -Current ($n + 1); $progress = Get-JarvisProgress $progressPath }
+    if (-not $DryRun) { Save-JarvisProgress -Path $progressPath -Completed (@($progress.completed) + @($n)) -Current ($n + 1); $progress = Get-JarvisProgress $progressPath }
 }
 Write-Output "JARVIS installer run complete through step $end."
