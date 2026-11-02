@@ -3,6 +3,7 @@ param(
     [switch]$DryRun,
     [ValidateRange(1,48)][int]$Step,
     [ValidateRange(1,48)][int]$From = 1,
+    [ValidateRange(1,48)][int]$Through,
     [switch]$Uninstall,
     [switch]$WithClaudeCode,
     [switch]$WithSerpApi,
@@ -40,19 +41,21 @@ if (-not (Test-Path $inputPath)) { Save-Inputs $form }
 $progress = Get-JarvisProgress $progressPath
 $first = if ($progress.completed) { ($progress.completed | ForEach-Object {[int]$_} | Measure-Object -Maximum).Maximum + 1 } else { 1 }
 $start = if ($Step) { $Step } elseif ($From -gt $first) { $From } else { $first }
-$end = if ($Step) { $Step } else { 44 }
+if ($Step -and $Through -and $Step -ne $Through) { throw '-Step and -Through cannot specify different steps.' }
+$end = if ($Step) { $Step } elseif ($Through) { $Through } else { 44 }
 
 for ($n = $start; $n -le $end; $n++) {
     if (@($progress.completed) -contains $n) { continue }
     Show-Action "Step $n pre-check"
     if (-not (Test-JarvisStepPreCheck -Number $n -Paths $paths -DryRun:$DryRun)) { throw "Step $n pre-check failed." }
+    if ($n -gt 12) { throw "Step $n not implemented: Milestone 1 stops after step 12." }
     if ($n -eq 15) {
         if (-not (Test-JarvisPortFree -Port 8899)) { throw 'Port 8899 must be free before dashboard installation.' }
         if (-not $DryRun -and -not (Test-JarvisRequiredProcesses)) { throw 'Paperclip, Postgres, and Ollama must remain running during installation.' }
     }
     switch ($n) {
         1 { if (-not $DryRun) { foreach ($f in @('USER.md','MEMORY.md')) { Backup-JarvisFile (Join-Path $paths.HermesHome "memories\$f") (Join-Path $paths.StateRoot 'backups') -UndoPath $undoPath | Out-Null }; Write-JarvisMemoryEntry (Join-Path $paths.HermesHome 'memories\USER.md') "$($form.name) works as: $($form.work). Time zone: $($form.timezone). Hours: $($form.hours). Weather city: $($form.weather_city)."; Write-JarvisMemoryEntry (Join-Path $paths.HermesHome 'memories\MEMORY.md') "JARVIS is chief of staff. Top priority: $($form.priority)." } }
-        2 { if (-not $DryRun) { Backup-JarvisFile (Join-Path $paths.HermesHome 'memories\USER.md') (Join-Path $paths.StateRoot 'backups') -UndoPath $undoPath | Out-Null; Write-JarvisMemoryEntry (Join-Path $paths.HermesHome 'memories\USER.md') "Interview answers: $($form.interview -join ' | ')" } }
+        2 { if (-not $DryRun) { Backup-JarvisFile (Join-Path $paths.HermesHome 'memories\USER.md') (Join-Path $paths.StateRoot 'backups') -UndoPath $undoPath | Out-Null; Write-JarvisMemoryEntry (Join-Path $paths.HermesHome 'memories\USER.md') "Interview answers: $($form.interview -join ' | ')`nOpen questions: none recorded by installer." } }
         3 { if (-not $DryRun) { Backup-JarvisFile (Join-Path $paths.HermesHome 'memories\MEMORY.md') (Join-Path $paths.StateRoot 'backups') -UndoPath $undoPath | Out-Null; Write-JarvisMemoryEntry (Join-Path $paths.HermesHome 'memories\MEMORY.md') (Get-Content (Join-Path $root 'templates\memory-rules.md') -Raw) } }
         4 { Invoke-JarvisStepAction -Number 4 -Paths $paths -Root $root -Form $form -DryRun:$DryRun }
         5 { Install-JarvisCrew $paths.HermesHome (Join-Path $root 'templates') $form.name -DryRun:$DryRun }
@@ -83,14 +86,23 @@ for ($n = $start; $n -le $end; $n++) {
                 $telegram = Get-Content (Join-Path $paths.StateRoot 'telegram.json') -Raw | ConvertFrom-Json
                 $map = @{ chat_id = $telegram.chat_id; topics = @{} }; foreach ($p in $telegram.topics.PSObject.Properties) { $map.topics[$p.Name] = $p.Value }
                 Write-JarvisTelegramPlugin $paths.HermesHome $map $form.name
-                & hermes plugins enable telegram_topic_profiles | Out-Null
-                & hermes config set gateway.multiplex_profiles true | Out-Null
-                & hermes gateway restart | Out-Null
+                & hermes plugins enable telegram_topic_profiles | Out-Null; if ($LASTEXITCODE -ne 0) { throw 'Hermes plugin enable failed.' }
+                & hermes config set gateway.multiplex_profiles true | Out-Null; if ($LASTEXITCODE -ne 0) { throw 'Hermes multiplex_profiles configuration failed.' }
+                & hermes gateway restart | Out-Null; if ($LASTEXITCODE -ne 0) { throw 'Hermes gateway restart failed.' }
             } else { Show-Action 'Install and enable telegram_topic_profiles; set multiplexing; restart gateway' }
         }
         10 { Invoke-JarvisStepAction -Number 10 -Paths $paths -Root $root -Form $form -DryRun:$DryRun }
         11 { if (-not $DryRun) { New-Item -ItemType Directory -Force -Path $paths.ProjectRoot | Out-Null; Initialize-JarvisActivityLog $logPath } }
-        12 { if (-not $DryRun) { foreach ($agent in @('JARVIS','DEV','RESEARCH','ASSISTANT')) { Add-JarvisActivity $logPath $agent 'installer smoke test' 'completed' 'gpt-oss:20b' } } }
+        12 {
+            if (-not $DryRun) {
+                $loggingRule = 'After substantial work, run the local log-task command with your agent name, brief description, status, and exact model. Log failures as well as successes.'
+                foreach ($profile in @('default','dev','research','assistant')) {
+                    $memoryFile = if ($profile -eq 'default') { Join-Path $paths.HermesHome 'memories\MEMORY.md' } else { Join-Path $paths.HermesHome "profiles\$profile\memories\MEMORY.md" }
+                    Write-JarvisMemoryEntry -MemoryFile $memoryFile -Entry $loggingRule
+                }
+                foreach ($agent in @('JARVIS','DEV','RESEARCH','ASSISTANT')) { Add-JarvisActivity $logPath $agent 'installer smoke test' 'completed' 'gpt-oss:20b' }
+            }
+        }
         13 { if ($WithClaudeCode) { Invoke-JarvisStepAction -Number 13 -Paths $paths -Root $root -Form $form -DryRun:$DryRun } else { Show-Action 'Claude Code skipped by switch' } }
         14 { Invoke-JarvisStepAction -Number 14 -Paths $paths -Root $root -Form $form -DryRun:$DryRun }
         15 { if (-not $DryRun) { Install-JarvisDashboardFiles $paths.ProjectRoot (Join-Path $root 'dashboard'); Register-JarvisDashboardTask $paths.ProjectRoot } }
@@ -107,12 +119,7 @@ for ($n = $start; $n -le $end; $n++) {
         41 { if ($WithTailscale -and -not $DryRun) { Install-JarvisAccess $paths.ProjectRoot -WithTailscale } }
         43 { if (-not $DryRun) { Test-JarvisInstall $paths.ProjectRoot $paths.HermesHome | ConvertTo-Json | Set-Content (Join-Path $paths.StateRoot 'verification.json') }; Invoke-JarvisStepAction -Number 43 -Paths $paths -Root $root -Form $form -DryRun:$DryRun }
         44 { if ($WithHomeAssistant) { Invoke-JarvisStepAction -Number 44 -Paths $paths -Root $root -Form $form -DryRun:$DryRun } else { Show-Action 'Home Assistant skipped by switch' } }
-        default { Invoke-JarvisStepAction -Number $n -Paths $paths -Root $root -Form $form -DryRun:$DryRun -WithSerpApi:$WithSerpApi -WithElevenLabs:$WithElevenLabs -WithComposio:$WithComposio -WithTailscale:$WithTailscale -WithHomeAssistant:$WithHomeAssistant -WithClaudeCode:$WithClaudeCode }
-    }
-    $markerPath = Join-Path $paths.ProjectRoot ("state\step-{0:D2}.json" -f $n)
-    if (-not $DryRun -and -not (Test-Path -LiteralPath $markerPath)) {
-        New-Item -ItemType Directory -Force -Path (Split-Path $markerPath -Parent) | Out-Null
-        [ordered]@{ step = $n; action = 'completed'; created_at = [DateTime]::UtcNow.ToString('o') } | ConvertTo-Json | Set-Content -LiteralPath $markerPath -Encoding UTF8
+        default { throw "Step $n not implemented: this milestone is intentionally gated before dashboard, voice, comms, and finish work." }
     }
     $postPassed = Test-JarvisStepPostCheck -Number $n -Paths $paths -Root $root -DryRun:$DryRun
     if (-not $postPassed) { throw "Step $n post-check failed; progress was not advanced." }

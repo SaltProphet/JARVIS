@@ -1,4 +1,21 @@
 Describe 'Installer progress with a fake Hermes home' {
+    It 'supports a bounded dry run through milestone one' {
+        $fakeHermes = Join-Path $TestDrive 'through-hermes'
+        $fakeState = Join-Path $TestDrive 'through-state'
+        New-Item -ItemType Directory -Force -Path $fakeHermes,$fakeState | Out-Null
+        $env:HERMES_HOME = $fakeHermes
+        $env:JARVIS_STATE_ROOT = $fakeState
+        try {
+            $output = @(& (Join-Path $PSScriptRoot '..\installer\install.ps1') -DryRun -Through 12 2>&1 | Out-String) -join "`n"
+            $? | Should Be $true
+            $output | Should Match 'through step 12'
+            $output | Should Not Match 'Step 13 pre-check'
+        } finally {
+            Remove-Item Env:HERMES_HOME -ErrorAction SilentlyContinue
+            Remove-Item Env:JARVIS_STATE_ROOT -ErrorAction SilentlyContinue
+        }
+    }
+
     It 'saves step one progress without nested array conversion errors' {
         $fakeHermes = Join-Path $TestDrive 'hermes'
         $fakeState = Join-Path $TestDrive 'state'

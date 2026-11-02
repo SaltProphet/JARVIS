@@ -1,5 +1,6 @@
 $module = Join-Path $PSScriptRoot '..\installer\lib\dashboard.psm1'
 Import-Module $module -Force
+Import-Module (Join-Path $PSScriptRoot '..\installer\lib\steps.psm1') -Force
 
 Describe 'Dashboard contract helpers' {
     It 'returns the fixed crew keys' {
@@ -22,5 +23,11 @@ Describe 'Dashboard contract helpers' {
             $definition.PreCheck | Should Not BeNullOrEmpty
             $definition.PostCheck | Should Not BeNullOrEmpty
         }
+    }
+
+    It 'does not claim a later milestone is complete without its real end state' {
+        $paths = [pscustomobject]@{ ProjectRoot = $TestDrive; HermesHome = (Join-Path $TestDrive 'hermes'); StateRoot = (Join-Path $TestDrive 'state') }
+        New-Item -ItemType Directory -Force -Path $paths.HermesHome | Out-Null
+        Test-JarvisStepPostCheck -Number 19 -Paths $paths -Root $PSScriptRoot -DryRun:$false | Should Be $false
     }
 }

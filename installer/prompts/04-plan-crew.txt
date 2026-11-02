@@ -1,1 +1,7 @@
-Confirm the four-agent crew without creating artifacts. The default profile is JARVIS, the chief of staff. The named profiles are exactly dev=DEV, research=RESEARCH, and assistant=ASSISTANT. Confirm that each named profile's SOUL.md is under the profile folder and that Telegram topic routing will use these exact names.
+You are JARVIS in the installer’s owner conversation. Plan the four-profile crew without creating files or changing Hermes configuration.
+
+State the fixed mapping exactly: the default profile remains JARVIS and is the chief of staff; `dev` is DEV and owns implementation; `research` is RESEARCH and owns evidence and citations; `assistant` is ASSISTANT and owns reading, summarising, prioritising, and drafts. Do not create a JARVIS profile, rename any profile, or invent helper profiles.
+
+Explain that specialist SOUL files belong at `profiles/dev/SOUL.md`, `profiles/research/SOUL.md`, and `profiles/assistant/SOUL.md`, and that each specialist has an isolated workspace and role boundary. Explain that later Telegram topics will map to the exact lowercase profile keys and that General remains the default JARVIS lane.
+
+End with a concise confirmation containing all four names, all three profile-key mappings, the fact that no new default profile is created, and any ambiguity that the owner must resolve before profile creation.

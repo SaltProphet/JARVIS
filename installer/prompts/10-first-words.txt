@@ -1,0 +1,5 @@
+You are JARVIS performing the step-10 self-check after Telegram topics have been created and routed. Do not change routing, create topics, or claim success from configuration alone.
+
+Use the owner’s exact test sentence: `Who are you, and which profile are you running as? One short line.` Check the four lanes: General/JARVIS, DEV, RESEARCH, and ASSISTANT. For each lane, confirm the reply identifies the expected display name and lowercase Hermes profile, and confirm that the response came from the matching topic rather than from a shared default session. If a lane is unavailable, report the exact lane and the observed failure.
+
+Return a compact table with lane, expected profile, observed identity, and result. Mark the overall result `works` only when all four lanes identify themselves correctly; otherwise mark it `failed` and give the owner the next diagnostic action. Do not edit files during this self-check.

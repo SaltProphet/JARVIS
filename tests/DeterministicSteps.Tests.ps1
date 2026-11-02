@@ -6,26 +6,6 @@ $deterministicSteps = @(
     @{ Number = 9;  Name = 'Telegram topic plugin' }
     @{ Number = 11; Name = 'activity logger' }
     @{ Number = 12; Name = 'durable logging smoke rows' }
-    @{ Number = 15; Name = 'dashboard service installation' }
-    @{ Number = 17; Name = 'dashboard split assets' }
-    @{ Number = 18; Name = 'dashboard backup baseline' }
-    @{ Number = 19; Name = 'dashboard Home state and events' }
-    @{ Number = 20; Name = 'dashboard Agents view' }
-    @{ Number = 21; Name = 'chat history and send' }
-    @{ Number = 22; Name = 'cron and content routes' }
-    @{ Number = 23; Name = 'research document protocol' }
-    @{ Number = 25; Name = 'research SerpApi skill' }
-    @{ Number = 26; Name = 'model inventory and update' }
-    @{ Number = 27; Name = 'Kokoro runtime' }
-    @{ Number = 29; Name = 'voice health gate' }
-    @{ Number = 30; Name = 'voice scenarios and proxy' }
-    @{ Number = 31; Name = 'voice greeting cache' }
-    @{ Number = 32; Name = 'push to talk state machine' }
-    @{ Number = 33; Name = 'conversation overlay' }
-    @{ Number = 34; Name = 'owner shortcuts and greetings' }
-    @{ Number = 35; Name = 'Comms dictation' }
-    @{ Number = 38; Name = 'briefing configuration' }
-    @{ Number = 39; Name = 'poller and stale cache' }
 )
 
 Describe 'Deterministic installer steps against a fake Hermes home' {
