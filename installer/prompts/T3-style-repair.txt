@@ -1,0 +1,1 @@
+Diagnose the visual symptom by measuring position, size, and computed style first. Check animation fill-mode and equal-specificity rule order. Restore from the latest backup if an edit caused the break.

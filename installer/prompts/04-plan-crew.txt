@@ -1,0 +1,1 @@
+Confirm the four-agent crew without creating artifacts. The default profile is JARVIS, the chief of staff. The named profiles are exactly dev=DEV, research=RESEARCH, and assistant=ASSISTANT. Confirm that each named profile's SOUL.md is under the profile folder and that Telegram topic routing will use these exact names.

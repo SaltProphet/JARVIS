@@ -1,0 +1,1 @@
+Diagnose an empty dashboard outside-in: process and 127.0.0.1:8899 listener, raw /api/state JSON, first console error, network requests, then window.__TEMPLATE__. Show the raw response beside the page.

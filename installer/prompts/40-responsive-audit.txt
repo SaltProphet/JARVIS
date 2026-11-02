@@ -1,0 +1,1 @@
+Audit the dashboard at 390, 768, 1280x800, 1440x900, and 1920x1080. Use screenshots and a silent console. Report overflow, clipping, tab reachability, primary action visibility, and any visual drift from /template. Change only responsive behavior, not the design language.

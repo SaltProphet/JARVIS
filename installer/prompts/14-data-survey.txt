@@ -1,0 +1,1 @@
+Survey Hermes state.db, named profile state databases, kanban stores, cron jobs, gateway_state.json, logs, and the JARVIS activity database in read-only mode. Report tables, timestamp forms, one example row per source, and what a dashboard can honestly derive. Do not write code or modify files.

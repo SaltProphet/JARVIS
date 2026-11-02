@@ -1,0 +1,1 @@
+Using the owner brief supplied in this prompt, update the four profiles with role-scoped memory, isolated workspace boundaries, the shared roster, and only the brief relevant to each role. Mark missing answers as "not provided yet". End with one short identity line for each profile.

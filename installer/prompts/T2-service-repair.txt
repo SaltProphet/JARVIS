@@ -1,0 +1,1 @@
+Diagnose the disconnected service by checking the profile tool path, using a fresh session, and checking the Composio connection state. Never claim a connection from memory instructions alone.

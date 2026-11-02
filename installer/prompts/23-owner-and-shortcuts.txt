@@ -1,0 +1,1 @@
+Confirm the owner-facing dashboard interaction rules: faces select agents and greet them, keys 1-4 select, Escape stops, and ? shows shortcuts. Do not change styling or invent placeholder metrics.

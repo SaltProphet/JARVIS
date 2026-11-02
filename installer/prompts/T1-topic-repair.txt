@@ -1,0 +1,1 @@
+Diagnose the wrong-agent topic in this order: topics.json thread id, exact profile spelling, and gateway restart. Name the cause, fix it, restart, and retest all four topics.

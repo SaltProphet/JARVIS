@@ -29,12 +29,14 @@ mode-restricted files.
 - `-Step`, `-From`, and resume state select ordered work. `-Uninstall` executes
   undo entries in reverse order and asks before deleting files.
 - Steps 45-48 are troubleshooting commands, not automatic install steps.
+- During Phase 3 and a real install, Paperclip, Postgres, and Ollama remain
+  running. Before step 15, the installer proves that TCP port 8899 is free.
 
 ## Ordered Steps
 
 | # / page | Class | Installer action | Files written | Verification |
 |---|---|---|---|---|
-| 1 / 1 | I | Collect identity, work, timezone, hours, and priority; run JARVIS identity turn. | `memories/USER.md`, `memories/MEMORY.md`, activity log | USER/MEMORY entries contain the owner facts and turn reply names JARVIS, owner, priority. |
+| 1 / 1 | I | Collect identity, work, timezone, hours, weather city, and priority; run JARVIS identity turn. The weather city is runtime input only. | `memories/USER.md`, `memories/MEMORY.md`, activity log; `state/inputs.json` is local-only | USER/MEMORY entries contain owner facts and turn reply names JARVIS, owner, priority; weather city is never committed. |
 | 2 / 2 | I | Collect exactly six interview answers up front; run the interview prompt with gaps marked. | `memories/USER.md`, `memories/MEMORY.md`, `state/inputs.json` | Six numbered answers are present; open questions and saved filename are reported. |
 | 3 / 3 | D | Install the original permanent operating rules into default memory. | default `memories/MEMORY.md` | All six rule headings are present and fit memory limits. |
 | 4 / 4 | A | Run the crew-planning turn and confirm fixed profile/name mapping. | activity log | Reply confirms default JARVIS plus `dev`, `research`, `assistant`. |
@@ -48,7 +50,7 @@ mode-restricted files.
 | 12 / 8f | D | Add the durable logging rule and write four smoke rows. | four profile memory files; `agent-logs.db` | Last five rows show four agent names and exact model fields. |
 | 13 / 8g | A | If `-WithClaudeCode`, run the original orientation prompt; otherwise record skipped. | activity log only | Orientation reports layout, crew, plugin, project, and builder-only role. |
 | 14 / 9 | A | Run DEV read-only survey against Hermes DBs, cron, gateway JSON, and log DB. | activity log only | Survey names sources, tables, timestamp types, and truthful dashboard limits. |
-| 15 / 10 | D | Install the stdlib dashboard server on `127.0.0.1:8899` and register a per-user scheduled task. | `server.py`, `dashboard.task.xml` | Contract keys, restart recovery, and 200-request handle stability pass. |
+| 15 / 10 | D | Confirm Paperclip/Postgres/Ollama remain running and port 8899 is free; install the stdlib dashboard server on `127.0.0.1:8899` and register a per-user scheduled task. | `server.py`, `dashboard.task.xml` | Process-preservation and port checks pass before installation; contract keys, restart recovery, and 200-request handle stability pass. |
 | 16 / 11 | I | Serve `/upload`; accept the owner template upload or use the bundled original template. | `jarvis-dashboard-template.html` | Extension, traversal, size, checklist, and saved-file checks pass. |
 | 17 / 12 | D | Keep `/template`; produce the original split dashboard and remove the shim only from `/`. | `index.html`, `styles.css`, `script.js`, `favicon.svg` | `__TEMPLATE__` is true only on `/template`; seven views and MIME/cache checks pass. |
 | 18 / 13 | D | Install backup script and version badge, starting at `v0.1`. | `jarvis-backup.ps1`, backup root, dashboard files | Baseline snapshot has manifest, restore script, and matching badge. |
@@ -60,7 +62,7 @@ mode-restricted files.
 | 24 / 18a | I | With `-WithSerpApi`, collect masked key and write one protected file; otherwise skip. | `%LOCALAPPDATA%\jarvis-secrets\serpapi.key` | File has no newline, is not printed, and is absent when skipped. |
 | 25 / 18b | D | Install one research-only SerpApi skill/command with citations and logging. | `profiles/research/skills/jarvis-search/` | New-session smoke search cites URLs and writes a research document. |
 | 26 / 19 | D | Use Hermes inventory picker to expose providers/models and atomically update one model block. | dashboard server/client; profile `config.yaml` | Each model card is live and one changed config block is preserved exactly. |
-| 27 / 19a | D | Install Windows voice prerequisites with `winget`/`pip`, verify model sizes, and create Kokoro service task. | `%LOCALAPPDATA%\jarvis-voice\`, `voice-server.py`, task XML | `/health` loads; `/say` returns 24 kHz WAV and loopback-only listener. |
+| 27 / 19a | D | Install a supported Python 3.12 interpreter via `py -3.12` or uv, create the Kokoro venv with that interpreter, record the exact interpreter in state, verify model sizes, and create the voice service task. | `%LOCALAPPDATA%\jarvis-voice\`, `voice-server.py`, task XML, local `state\voice-runtime.json` | `/health` loads; `/say` returns 24 kHz WAV and loopback-only listener; state records the exact Python executable/version. |
 | 28 / 19b | I | With `-WithElevenLabs`, collect masked key; otherwise record local-only. | `%LOCALAPPDATA%\jarvis-secrets\elevenlabs.key` | Key length/status is shown without key content. |
 | 29 / 19c | D | Gate voice work on Kokoro health/synthesis and optional ElevenLabs voices check. | activity log | Every verdict is `works`, `skipped`, or `failed`; failed blocks later voice steps. |
 | 30 / 20 | D | Add server-stored scenarios, proxy routes, transcription, fallback, and engine header. | dashboard server/client; `voice-scenarios.json` | Key-present and key-absent Control states, fallback, and output metadata pass. |
@@ -71,7 +73,7 @@ mode-restricted files.
 | 35 / 24 | D | Add Comms dictation, append-only pauses, send clearing, and upload fallback. | `script.js`, `server.py` | Dictated text survives pauses and cannot refill after send. |
 | 36 / 25 | I | With `-WithComposio`, install CLI and pause for login plus two browser links. | `%LOCALAPPDATA%\composio\`, state record | Both connections show ACTIVE and only two read operations are available. |
 | 37 / 26 | I | Install allowlisted mail/calendar command and deny hook; request one owner approval. | profile skill/command; `config.yaml` hooks; allowlist | JARVIS/ASSISTANT work; DEV/RESEARCH are denied in a fresh gateway session. |
-| 38 / 26b | D | Add `brief`, Berlin weather, trigger phrases, and three-sentence spoken format. | JARVIS memory; profile skill/command | New-session output has mail/weather/calendar rules and sentence-count proof. |
+| 38 / 26b | D | Add `brief`, the step-1 owner-form weather city, trigger phrases, and three-sentence spoken format. | JARVIS memory; profile skill/command | New-session output has mail/weather/calendar rules and sentence-count proof; the city is read from local runtime state, never hardcoded. |
 | 39 / 26c | D | Add the separate throttled poller and stale cache chips. | poller, cache JSON, task XML, `server.py` | At most two calls per ten minutes, one auto-start per minute, and stale state is honest. |
 | 40 / 27 | A | Run responsive screenshots and console audit at all five required sizes. | evidence screenshots and activity log | No overflow, clipping, tab loss, or console errors; Chromium is terminated. |
 | 41 / 28 | I | With `-WithTailscale`, install Tailscale, authorize, serve HTTPS, and add Defender rules. | scheduled task; firewall rules; state record | Loopback sockets, HTTPS tailnet URL, reboot recovery, and no public listener pass. |
@@ -95,7 +97,7 @@ mode-restricted files.
 | 24 | Start `v0.1`; increment by `0.1` after each wiring card; stamp `v1.0` only at final verification. | Matches both version examples and keeps a visible monotonic history. |
 | 25 | Add non-contract `last_session_at` and `owner` only inside the server's internal normalized records; expose them only where the view needs them. | Preserves the fixed top-level API contract while satisfying the view requirements. |
 | 26 | Windows: `winget install --id Tailscale.Tailscale`; Defender via `New-NetFirewallRule`; Composio first attempt `py -m pip install --user composio`, with the exact successful command recorded. | Native Windows tools, reversible firewall rules, and no guessed vendor shell installer. |
-| 27 | Geocode Berlin with Open-Meteo `/v1/search?name=Berlin&count=1&language=en&format=json`; request `temperature_2m_max`, `temperature_2m_min`, and `weather_code` with `timezone=auto` and Celsius. | No weather key, stable fields, and city-specific output. |
+| 27 | Geocode the owner-form `weather_city` with Open-Meteo `/v1/search?name=<url-encoded-city>&count=1&language=en&format=json`; request `temperature_2m_max`, `temperature_2m_min`, and `weather_code` with `timezone=auto` and Celsius. | No weather key, stable fields, and city-specific output without a committed location. |
 | 28 | `py -m pip install --user playwright` followed by `py -m playwright install chromium`; fallback is an existing Edge/Chrome executable and otherwise an explicit unchecked result. | Works on both PowerShell versions and avoids assuming admin rights. |
 
 ## Explicit Windows Deviations To Revisit During Build

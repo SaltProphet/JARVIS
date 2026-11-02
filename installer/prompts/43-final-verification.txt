@@ -1,0 +1,1 @@
+Run the final evidence checklist against the installed JARVIS system. Report evidence, not confidence. Mark checks requiring the owner's ear or phone explicitly, then write a one-paragraph owner summary.

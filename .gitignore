@@ -1,0 +1,5 @@
+installer/state/
+!installer/state/.gitkeep
+tests/.tmp/
+*.pyc
+__pycache__/

@@ -1,0 +1,1 @@
+Check the bundled dashboard manual against the actual Windows install. Correct only claims that can be proven from files or commands. Keep operate-first order, explain meaning, and list every changed or unverifiable claim.
