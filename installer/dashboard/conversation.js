@@ -65,4 +65,5 @@ class ConversationState {
   }
 }
 
+if (typeof globalThis !== 'undefined') Object.assign(globalThis, { ConversationState, HOLD_MS, REST_MS, IDLE_MS });
 if (typeof module !== 'undefined') module.exports = { ConversationState, HOLD_MS, REST_MS, IDLE_MS };
