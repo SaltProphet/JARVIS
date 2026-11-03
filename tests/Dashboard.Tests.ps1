@@ -61,4 +61,13 @@ Describe 'Dashboard contract helpers' {
         $text | Should Match 'GMAIL_FETCH_EMAILS'
         $text | Should Match 'GOOGLECALENDAR_EVENTS_LIST'
     }
+
+    It 'installs the private-service allowlist and deny hook' {
+        $module = Join-Path $PSScriptRoot '..\installer\lib\private-services.psm1'
+        Import-Module $module -Force
+        $project = Join-Path $TestDrive 'private-services'
+        Install-JarvisPrivateServices $project (Join-Path $PSScriptRoot '..\installer')
+        (Get-Content (Join-Path $project 'private-services.json') -Raw) | Should Match 'owner-approval-pending'
+        (Get-Content (Join-Path $PSScriptRoot '..\installer\hooks\deny-private-services.py') -Raw) | Should Match 'pre_tool_call'
+    }
 }

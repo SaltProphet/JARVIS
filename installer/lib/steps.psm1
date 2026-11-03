@@ -177,6 +177,13 @@ function Test-JarvisStepPostCheck {
             $text = [IO.File]::ReadAllText($state)
             return $text -match 'pending-owner' -and $text -match 'GMAIL_FETCH_EMAILS' -and $text -match 'GOOGLECALENDAR_EVENTS_LIST'
         }
+        37 {
+            $state = Join-Path $Paths.ProjectRoot 'private-services.json'
+            $hook = Join-Path $Root 'hooks\deny-private-services.py'
+            if (-not (Test-Path -LiteralPath $state -PathType Leaf) -or -not (Test-Path -LiteralPath $hook -PathType Leaf)) { return $false }
+            $stateText = [IO.File]::ReadAllText($state); $hookText = [IO.File]::ReadAllText($hook)
+            return $stateText -match 'GMAIL_FETCH_EMAILS' -and $stateText -match 'GOOGLECALENDAR_EVENTS_LIST' -and $stateText -match 'DEV' -and $stateText -match 'RESEARCH' -and $hookText -match 'def pre_tool_call'
+        }
         default { return $false }
     }
 }
