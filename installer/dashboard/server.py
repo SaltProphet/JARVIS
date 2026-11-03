@@ -347,7 +347,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/cron": return json_response(self, cron_payload())
         if path == "/api/voice/config": return json_response(self, read_voice_config())
         if path == "/docs.md": return self.send_file(ROOT / "docs.md", "text/markdown; charset=utf-8")
-        if path in ("/", "/template", "/styles.css", "/script.js", "/favicon.svg", "/upload"):
+        if path in ("/", "/template", "/styles.css", "/script.js", "/conversation.js", "/favicon.svg", "/upload"):
             file = {"/": "index.html", "/template": "jarvis-dashboard-template.html", "/upload": "upload.html"}.get(path, path.lstrip("/"))
             return self.send_file(ROOT / file)
         if Path(path).suffix.lower() in {".png", ".jpg", ".jpeg", ".webp", ".svg"} and path.count("/") == 1:

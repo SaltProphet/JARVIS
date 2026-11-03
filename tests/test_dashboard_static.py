@@ -45,7 +45,7 @@ class DashboardStaticTests(unittest.TestCase):
     def test_template_marker_is_executable_only_on_template_and_badge_only_on_index(self):
         with tempfile.TemporaryDirectory() as directory:
             project = Path(directory)
-            for name in ("index.html", "jarvis-dashboard-template.html", "styles.css", "script.js", "favicon.svg", "upload.html"):
+            for name in ("index.html", "jarvis-dashboard-template.html", "styles.css", "script.js", "conversation.js", "favicon.svg", "upload.html"):
                 shutil.copyfile(DASHBOARD / name, project / name)
             with running_server(project) as port:
                 _, _, index = get(port, "/")
@@ -53,6 +53,7 @@ class DashboardStaticTests(unittest.TestCase):
 
             self.assertNotIn(b"__TEMPLATE__", index)
             self.assertIn(b"data-version", index)
+            self.assertIn(b"conversation.js", index)
             self.assertIn(b"window.__TEMPLATE__=true", template)
             self.assertNotIn(b"data-version", template)
             self.assertIn(b"<script", template)
@@ -63,7 +64,7 @@ class DashboardStaticTests(unittest.TestCase):
     def test_static_mime_cache_and_image_etag_contracts_are_explicit(self):
         with tempfile.TemporaryDirectory() as directory:
             project = Path(directory)
-            for name in ("index.html", "jarvis-dashboard-template.html", "styles.css", "script.js", "favicon.svg", "upload.html"):
+            for name in ("index.html", "jarvis-dashboard-template.html", "styles.css", "script.js", "conversation.js", "favicon.svg", "upload.html"):
                 shutil.copyfile(DASHBOARD / name, project / name)
             project.joinpath("photo.png").write_bytes(b"png fixture")
             with running_server(project) as port:

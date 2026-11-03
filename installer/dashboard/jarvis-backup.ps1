@@ -12,7 +12,7 @@ New-Item -ItemType Directory -Force -Path $BackupRoot | Out-Null
 $target = Join-Path $BackupRoot ("$Timestamp-$([guid]::NewGuid().ToString('N'))")
 New-Item -ItemType Directory -Path $target | Out-Null
 
-$wanted = @('server.py','index.html','styles.css','script.js','jarvis-dashboard-template.html','version.txt')
+$wanted = @('server.py','index.html','styles.css','script.js','conversation.js','jarvis-dashboard-template.html','version.txt')
 $copied = @()
 foreach ($file in $wanted) {
     $source = Join-Path $ProjectRoot $file

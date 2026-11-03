@@ -1,0 +1,24 @@
+const assert = require('assert');
+const { ConversationState } = require('../installer/dashboard/conversation.js');
+
+const state = new ConversationState();
+assert.equal(state.phase, 'rest');
+assert.equal(state.selectedAgent, 'default');
+assert.equal(state.beginListening('dev'), true);
+assert.equal(state.phase, 'listening');
+assert.equal(state.selectedAgent, 'dev');
+assert.equal(state.appendTranscript('hello'), 'hello');
+assert.equal(state.beginReply(), true);
+assert.equal(state.phase, 'waiting-for-reply');
+assert.equal(state.beginSpeaking(), true);
+assert.equal(state.phase, 'speaking');
+assert.equal(state.interrupt(), true);
+assert.equal(state.phase, 'rest');
+const generation = state.beginDictation();
+assert.equal(state.acceptDictation(generation, 'draft'), 'draft');
+state.finishDictation();
+assert.equal(state.acceptDictation(generation, 'late'), null);
+assert.equal(ConversationState.isTextControl({ tagName: 'TEXTAREA' }), true);
+assert.equal(ConversationState.isTextControl({ tagName: 'DIV', isContentEditable: true }), true);
+assert.equal(ConversationState.isTextControl({ tagName: 'BUTTON' }), false);
+console.log('conversation state ok');
