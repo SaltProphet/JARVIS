@@ -127,7 +127,7 @@ function Invoke-JarvisAgentTurn {
     $turnWorkspace = Join-Path ([IO.Path]::GetTempPath()) ("jarvis-installer-step-{0}-{1}" -f $StepNumber, [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Force -Path $turnWorkspace | Out-Null
     $quotedWorkspace = '"' + ([regex]::Replace($turnWorkspace, '(\\*)"', '$1$1\"') -replace '(\\+)$', '$1$1') + '"'
-    $processArguments = @('--safe-mode', '--ignore-user-config', '--ignore-rules', '--model', 'gpt-oss:20b', '--reasoning', 'none', '-t', (Get-JarvisInstallerToolset -StepNumber $StepNumber), '--in', $quotedWorkspace)
+    $processArguments = @('--safe-mode', '--ignore-user-config', '--ignore-rules', '--model', 'gpt-oss:20b', '--provider', 'custom', '--base-url', 'http://127.0.0.1:11434/v1', '--reasoning', 'none', '-t', (Get-JarvisInstallerToolset -StepNumber $StepNumber), '--in', $quotedWorkspace)
     if ($Profile -ne 'default') { $processArguments += @('-p', $Profile) }
     $processArguments += @('-z', ('"' + ([regex]::Replace($prompt, '(\\*)"', '$1$1\"') -replace '(\\+)$', '$1$1') + '"'))
     $outFile = [IO.Path]::GetTempFileName(); $errFile = [IO.Path]::GetTempFileName(); $started = Get-Date

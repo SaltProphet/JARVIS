@@ -148,6 +148,8 @@ Describe 'JARVIS Hermes process invocation' {
         $response | Should Match '--ignore-user-config'
         $response | Should Match '--ignore-rules'
         $response | Should Match '--model\|gpt-oss:20b'
+        $response | Should Match '--provider\|custom'
+        $response | Should Match '--base-url\|http://127\.0\.0\.1:11434/v1'
         $response | Should Match '--reasoning\|none'
         $response | Should Match '-t\|clarify'
     }
