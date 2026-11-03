@@ -54,6 +54,8 @@ class DashboardStaticTests(unittest.TestCase):
             self.assertNotIn(b"__TEMPLATE__", index)
             self.assertIn(b"data-version", index)
             self.assertIn(b"conversation.js", index)
+            self.assertIn(b'id="conversation-overlay"', index)
+            self.assertIn(b'id="conversation-transcript"', index)
             self.assertIn(b"window.__TEMPLATE__=true", template)
             self.assertNotIn(b"data-version", template)
             self.assertIn(b"<script", template)
