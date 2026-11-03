@@ -98,3 +98,31 @@ Describe 'JARVIS specialist profile encoding safeguards' {
         Read-JarvisUtf8Text $config | Should Be $original
     }
 }
+
+Describe 'JARVIS Hermes process invocation' {
+    It 'fails clearly when the work directory does not exist' {
+        $prompt = Join-Path $TestDrive 'missing-work-prompt.txt'
+        Write-JarvisUtf8Text -Path $prompt -Text 'prompt'
+        { Invoke-JarvisAgentTurn -PromptFile $prompt -Hermes 'missing-hermes.exe' -WorkDirectory (Join-Path $TestDrive 'missing-work') } | Should Throw
+    }
+
+    It 'defaults the work directory and passes a quoted multiline prompt intact' {
+        $root = Join-Path $TestDrive 'hermes-invocation'
+        New-Item -ItemType Directory -Force -Path $root | Out-Null
+        $promptFile = Join-Path $root 'prompt.txt'
+        $hermes = Join-Path $root 'fake-hermes.exe'
+        $quote = [char]34
+        Write-JarvisUtf8Text -Path $promptFile -Text "First line with a $quote quote $quote`r`nSecond line with $quote quotes $quote"
+        Add-Type -TypeDefinition 'using System; public static class FakeHermes { public static int Main(string[] args) { Console.WriteLine(args[1]); Console.WriteLine("stub response"); return 0; } }' -OutputAssembly $hermes -OutputType ConsoleApplication
+        $oldHome = $env:HERMES_HOME
+        try {
+            $env:HERMES_HOME = $root
+            $response = Invoke-JarvisAgentTurn -PromptFile $promptFile -Hermes $hermes -StepNumber 6 -LogPath (Join-Path $root 'missing.log')
+        } finally {
+            if ($null -eq $oldHome) { Remove-Item Env:HERMES_HOME -ErrorAction SilentlyContinue } else { $env:HERMES_HOME = $oldHome }
+        }
+        $response | Should Match 'First line with a .*quote'
+        $response | Should Match 'Second line with .*quotes'
+        $response | Should Match 'stub response'
+    }
+}

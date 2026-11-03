@@ -10,9 +10,12 @@ function Invoke-JarvisStepAction {
     param([int]$Number, [psobject]$Paths, [string]$Root, [psobject]$Form, [switch]$DryRun, [int]$TimeoutMinutes = 25)
     $prompt = Get-JarvisStepPrompt -Number $Number -Root $Root
     if ($prompt) {
-        if ($DryRun) { Write-Output "DRY-RUN: owner/agent self-check $Number using $([IO.Path]::GetFileName($prompt))"; return }
+        if ($DryRun -and -not $env:JARVIS_DRYRUN_HERMES) { Write-Output "DRY-RUN: owner/agent self-check $Number using $([IO.Path]::GetFileName($prompt))"; return }
         Write-Host "Don't post in the Telegram group until this step finishes."
-        $response = Invoke-JarvisAgentTurn -PromptFile $prompt -Profile 'default' -WorkDirectory $Paths.ProjectRoot -StepNumber $Number -TimeoutMinutes $TimeoutMinutes
+        $hermes = if ($env:JARVIS_DRYRUN_HERMES) { $env:JARVIS_DRYRUN_HERMES } else { 'hermes' }
+        $logPath = if ($DryRun) { Join-Path $Paths.StateRoot 'dryrun-agent.log' } else { Join-Path $env:LOCALAPPDATA 'hermes\logs\agent.log' }
+        $response = Invoke-JarvisAgentTurn -PromptFile $prompt -Profile 'default' -Hermes $hermes -WorkDirectory $Paths.HermesHome -StepNumber $Number -TimeoutMinutes $TimeoutMinutes -LogPath $logPath -SkipOllamaCheck:$DryRun
+        if ($DryRun) { Write-Output "DRY-RUN: stub Hermes turn completed for step $Number"; return }
         New-Item -ItemType Directory -Force -Path $Paths.StateRoot | Out-Null
         Write-JarvisUtf8Text -Path (Join-Path $Paths.StateRoot ("agent-turn-{0:D2}.txt" -f $Number)) -Text $response
         $lastLine = @($response -split "`r?`n" | Where-Object { $_.Trim() })[-1]

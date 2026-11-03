@@ -95,24 +95,29 @@ function Write-JarvisMemoryEntry {
 }
 
 function Invoke-JarvisAgentTurn {
-    param([string]$PromptFile, [string]$Profile = 'default', [string]$Hermes = 'hermes', [string]$WorkDirectory, [int]$StepNumber = 0, [int]$TimeoutMinutes = 25, [string]$LogPath = $(Join-Path $env:LOCALAPPDATA 'hermes\logs\agent.log'))
+    param([string]$PromptFile, [string]$Profile = 'default', [string]$Hermes = 'hermes', [string]$WorkDirectory, [int]$StepNumber = 0, [int]$TimeoutMinutes = 25, [string]$LogPath = $(Join-Path $env:LOCALAPPDATA 'hermes\logs\agent.log'), [switch]$SkipOllamaCheck)
+    if ([string]::IsNullOrWhiteSpace($WorkDirectory)) { $WorkDirectory = if ($env:HERMES_HOME) { $env:HERMES_HOME } else { Join-Path $env:LOCALAPPDATA 'hermes' } }
+    if (-not (Test-Path -LiteralPath $WorkDirectory -PathType Container)) { throw "Hermes work directory does not exist: $WorkDirectory" }
     $prompt = Read-JarvisUtf8Text -Path $PromptFile
     $prompt = "This is an isolated installer turn for step $StepNumber. Do only the one job in this prompt. Do not answer a different question and do not use a resumed conversation.`n`n$prompt"
-    $args = @(); if ($Profile -ne 'default') { $args += @('-p', $Profile) }; $args += @('-z', $prompt)
+    $processArguments = @(); if ($Profile -ne 'default') { $processArguments += @('-p', $Profile) }; $processArguments += @('-z', ('"' + ([regex]::Replace($prompt, '(\\*)"', '$1$1\"') -replace '(\\+)$', '$1$1') + '"'))
     $outFile = [IO.Path]::GetTempFileName(); $errFile = [IO.Path]::GetTempFileName(); $started = Get-Date
     try {
-        $process = Start-Process -FilePath $Hermes -ArgumentList $args -WorkingDirectory $WorkDirectory -RedirectStandardOutput $outFile -RedirectStandardError $errFile -PassThru
+        $process = Start-Process -FilePath $Hermes -ArgumentList ($processArguments -join ' ') -WorkingDirectory $WorkDirectory -RedirectStandardOutput $outFile -RedirectStandardError $errFile -PassThru
         $lastLogLength = 0; $nextHeartbeat = $started.AddSeconds(30)
         while (-not $process.HasExited) {
             Start-Sleep -Seconds 1
             $elapsed = (Get-Date) - $started
             if ((Get-Date) -ge $nextHeartbeat) { Write-Host (Format-JarvisModelHeartbeat -Step $StepNumber -Elapsed $elapsed); $nextHeartbeat = $nextHeartbeat.AddSeconds(30) }
             if (Test-Path $LogPath) { $log = Read-JarvisUtf8Text $LogPath; if ($log.Length -gt $lastLogLength) { $new = $log.Substring($lastLogLength); $lastLogLength = $log.Length; $new -split "`r?`n" | Where-Object { $_ -match 'APIConnectionError|Connection error|API call failed' } | ForEach-Object { Write-Host $_ } } }
-            try { Invoke-RestMethod -Uri 'http://127.0.0.1:11434/api/tags' -TimeoutSec 5 | Out-Null } catch { throw "Ollama stopped responding during step $StepNumber. Start it and rerun; the installer resumes at step $StepNumber." }
+            if (-not $SkipOllamaCheck) { try { Invoke-RestMethod -Uri 'http://127.0.0.1:11434/api/tags' -TimeoutSec 5 | Out-Null } catch { throw "Ollama stopped responding during step $StepNumber. Start it and rerun; the installer resumes at step $StepNumber." } }
             if ($elapsed.TotalMinutes -ge $TimeoutMinutes) { $process.Kill(); throw (Get-JarvisModelTimeoutMessage -Step $StepNumber -Minutes $TimeoutMinutes) }
         }
-        $result = @((Get-Content -LiteralPath $outFile -Encoding UTF8), (Get-Content -LiteralPath $errFile -Encoding UTF8))
-        if ($process.ExitCode -ne 0) { throw "Hermes turn failed for ${Profile}: $($result -join ' ')" }
+        $process.WaitForExit()
+        $process.Refresh()
+        $result = @(Get-Content -LiteralPath $outFile -Encoding UTF8; Get-Content -LiteralPath $errFile -Encoding UTF8)
+        $exitCode = if ($null -eq $process.ExitCode) { 0 } else { [int]$process.ExitCode }
+        if ($exitCode -ne 0) { throw "Hermes turn failed for ${Profile} (exit $exitCode): $($result -join ' ')" }
         $result -join [Environment]::NewLine
     } finally { Remove-Item $outFile,$errFile -Force -ErrorAction SilentlyContinue }
 }
