@@ -140,6 +140,15 @@ function Test-JarvisStepPostCheck {
                 return @($manifest.files).Count -ge 6
             } catch { return $false }
         }
+        32 {
+            $dashboard = Join-Path $Root 'dashboard'
+            $conversation = Join-Path $dashboard 'conversation.js'
+            $script = Join-Path $dashboard 'script.js'
+            if (-not (Test-Path -LiteralPath $conversation -PathType Leaf) -or -not (Test-Path -LiteralPath $script -PathType Leaf)) { return $false }
+            $conversationText = [IO.File]::ReadAllText($conversation)
+            $scriptText = [IO.File]::ReadAllText($script)
+            return $conversationText -match 'PUSH_TO_TALK_MS\s*=\s*5000' -and $conversationText -match 'startPushToTalk' -and $conversationText -match 'finishPushToTalk' -and $scriptText -match 'setTimeout\(\(\) => stopSpeechTurn' -and $scriptText -match 'acceptDictation\(generation'
+        }
         default { return $false }
     }
 }

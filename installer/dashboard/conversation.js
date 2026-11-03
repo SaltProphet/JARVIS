@@ -1,6 +1,7 @@
 const HOLD_MS = 700;
 const REST_MS = 1100;
 const IDLE_MS = 30000;
+const PUSH_TO_TALK_MS = 5000;
 
 class ConversationState {
   constructor() {
@@ -15,6 +16,12 @@ class ConversationState {
     this.selectedAgent = agent;
     this.phase = 'listening';
     return true;
+  }
+
+  startPushToTalk(agent = this.selectedAgent) {
+    if (!this.beginListening(agent)) return null;
+    this.dictationGeneration += 1;
+    return this.dictationGeneration;
   }
 
   appendTranscript(text) {
@@ -51,8 +58,13 @@ class ConversationState {
   }
 
   acceptDictation(generation, text) {
-    if (generation !== this.dictationGeneration || this.phase !== 'dictating') return null;
+    if (generation !== this.dictationGeneration || (this.phase !== 'listening' && this.phase !== 'dictating')) return null;
     return this.appendTranscript(text);
+  }
+
+  finishPushToTalk(generation) {
+    if (generation !== this.dictationGeneration || this.phase !== 'listening') return false;
+    return this.beginReply();
   }
 
   finishDictation() {
@@ -65,5 +77,5 @@ class ConversationState {
   }
 }
 
-if (typeof globalThis !== 'undefined') Object.assign(globalThis, { ConversationState, HOLD_MS, REST_MS, IDLE_MS });
-if (typeof module !== 'undefined') module.exports = { ConversationState, HOLD_MS, REST_MS, IDLE_MS };
+if (typeof globalThis !== 'undefined') Object.assign(globalThis, { ConversationState, HOLD_MS, REST_MS, IDLE_MS, PUSH_TO_TALK_MS });
+if (typeof module !== 'undefined') module.exports = { ConversationState, HOLD_MS, REST_MS, IDLE_MS, PUSH_TO_TALK_MS };

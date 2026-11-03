@@ -30,4 +30,9 @@ Describe 'Dashboard contract helpers' {
         New-Item -ItemType Directory -Force -Path $paths.HermesHome | Out-Null
         Test-JarvisStepPostCheck -Number 19 -Paths $paths -Root $PSScriptRoot -DryRun:$false | Should Be $false
     }
+
+    It 'verifies the repository push-to-talk artifact for step 32' {
+        $paths = [pscustomobject]@{ ProjectRoot = $TestDrive; HermesHome = (Join-Path $TestDrive 'hermes'); StateRoot = (Join-Path $TestDrive 'state') }
+        Test-JarvisStepPostCheck -Number 32 -Paths $paths -Root (Join-Path $PSScriptRoot '..\installer') -DryRun:$false | Should Be $true
+    }
 }

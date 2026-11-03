@@ -168,7 +168,7 @@ for ($n = $start; $n -le $end; $n++) {
         29 { Invoke-JarvisStepAction -Number 29 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
         30 { Invoke-JarvisStepAction -Number 30 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
         31 { Invoke-JarvisStepAction -Number 31 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
-        32 { Invoke-JarvisStepAction -Number 32 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
+        32 { Show-Action 'Use the repository dashboard fixed-timing push-to-talk state machine; no model code generation required' }
         33 { Invoke-JarvisStepAction -Number 33 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
         34 { Invoke-JarvisStepAction -Number 34 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
         35 { Invoke-JarvisStepAction -Number 35 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }

@@ -1,5 +1,5 @@
 const assert = require('assert');
-const { ConversationState } = require('../installer/dashboard/conversation.js');
+const { ConversationState, PUSH_TO_TALK_MS } = require('../installer/dashboard/conversation.js');
 
 const state = new ConversationState();
 assert.equal(state.phase, 'rest');
@@ -21,4 +21,14 @@ assert.equal(state.acceptDictation(generation, 'late'), null);
 assert.equal(ConversationState.isTextControl({ tagName: 'TEXTAREA' }), true);
 assert.equal(ConversationState.isTextControl({ tagName: 'DIV', isContentEditable: true }), true);
 assert.equal(ConversationState.isTextControl({ tagName: 'BUTTON' }), false);
+assert.equal(PUSH_TO_TALK_MS, 5000);
+const push = new ConversationState();
+const pushGeneration = push.startPushToTalk('dev');
+assert.equal(push.phase, 'listening');
+assert.equal(push.acceptDictation(pushGeneration, 'fixed timing'), 'fixed timing');
+assert.equal(push.finishPushToTalk(pushGeneration), true);
+assert.equal(push.phase, 'waiting-for-reply');
+assert.equal(push.acceptDictation(pushGeneration, 'self echo'), null);
+assert.equal(push.interrupt(), true);
+assert.equal(push.acceptDictation(pushGeneration, 'late echo'), null);
 console.log('conversation state ok');
