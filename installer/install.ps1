@@ -176,7 +176,7 @@ for ($n = $start; $n -le $end; $n++) {
         37 { if (-not $DryRun) { Install-JarvisPrivateServices $paths.ProjectRoot $root }; Show-Action 'Install private-service allowlist and DEV/RESEARCH deny hooks' }
         38 { if (-not $DryRun) { Write-JarvisBriefingConfig (Join-Path $paths.ProjectRoot 'briefing.json') $form.weather_city }; Show-Action 'Use owner-city briefing config with four triggers and a three-sentence spoken format' }
         39 { if (-not $DryRun) { Install-JarvisPoller $paths.ProjectRoot $root }; Show-Action 'Install throttled private-services poller and stale cache chips' }
-        40 { Invoke-JarvisStepAction -Number 40 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
+        40 { if (-not $DryRun) { Write-JarvisResponsiveAudit (Join-Path $paths.ProjectRoot 'responsive-audit.json') (Join-Path $root 'dashboard') }; Show-Action 'Record responsive evidence for 390, 768, 1280, 1440, and 1920 widths' }
         41 { if ($WithTailscale) { Show-Action 'Install Tailscale, await owner authorization, and configure HTTPS serve' } else { Show-Action 'Tailscale skipped by switch' } }
         42 { Invoke-JarvisStepAction -Number 42 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
         43 { if (-not $DryRun) { Test-JarvisInstall $paths.ProjectRoot $paths.HermesHome | ConvertTo-Json | Set-Content (Join-Path $paths.StateRoot 'verification.json') }; Invoke-JarvisStepAction -Number 43 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }

@@ -88,4 +88,13 @@ Describe 'Dashboard contract helpers' {
         (Get-Content (Join-Path $project 'poller.json') -Raw) | Should Match 'max_calls_per_run'
         (Get-Content (Join-Path $PSScriptRoot '..\installer\dashboard\private-services-poller.py') -Raw) | Should Match 'def is_stale'
     }
+
+    It 'writes responsive evidence for all required viewport widths' {
+        Import-Module (Join-Path $PSScriptRoot '..\installer\lib\responsive.psm1') -Force
+        $path = Join-Path $TestDrive 'responsive.json'
+        Write-JarvisResponsiveAudit $path (Join-Path $PSScriptRoot '..\installer\dashboard')
+        $text = Get-Content $path -Raw
+        $text | Should Match '390'
+        $text | Should Match '1920'
+    }
 }

@@ -197,6 +197,12 @@ function Test-JarvisStepPostCheck {
             $text = [IO.File]::ReadAllText($config); $pollerText = [IO.File]::ReadAllText($poller)
             return $text -match 'max_age_minutes.*25' -and $text -match 'max_calls_per_run.*2' -and $pollerText -match 'def is_stale' -and $pollerText -match 'os.replace'
         }
+        40 {
+            $audit = Join-Path $Paths.ProjectRoot 'responsive-audit.json'
+            if (-not (Test-Path -LiteralPath $audit -PathType Leaf)) { return $false }
+            $text = [IO.File]::ReadAllText($audit)
+            return $text -match '390' -and $text -match '768' -and $text -match '1280' -and $text -match '1440' -and $text -match '1920' -and $text -match 'source-only'
+        }
         default { return $false }
     }
 }
