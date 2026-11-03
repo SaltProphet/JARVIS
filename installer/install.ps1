@@ -175,7 +175,7 @@ for ($n = $start; $n -le $end; $n++) {
         36 { if (-not $DryRun) { Install-JarvisComposio $paths.ProjectRoot }; Show-Action 'Composio local state prepared; owner login and Gmail/Calendar OAuth remain pending-owner' }
         37 { if (-not $DryRun) { Install-JarvisPrivateServices $paths.ProjectRoot $root }; Show-Action 'Install private-service allowlist and DEV/RESEARCH deny hooks' }
         38 { if (-not $DryRun) { Write-JarvisBriefingConfig (Join-Path $paths.ProjectRoot 'briefing.json') $form.weather_city }; Show-Action 'Use owner-city briefing config with four triggers and a three-sentence spoken format' }
-        39 { Show-Action 'Install throttled private-services poller and stale cache chips' }
+        39 { if (-not $DryRun) { Install-JarvisPoller $paths.ProjectRoot $root }; Show-Action 'Install throttled private-services poller and stale cache chips' }
         40 { Invoke-JarvisStepAction -Number 40 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
         41 { if ($WithTailscale) { Show-Action 'Install Tailscale, await owner authorization, and configure HTTPS serve' } else { Show-Action 'Tailscale skipped by switch' } }
         42 { Invoke-JarvisStepAction -Number 42 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }

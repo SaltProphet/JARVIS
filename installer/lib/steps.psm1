@@ -190,6 +190,13 @@ function Test-JarvisStepPostCheck {
             $text = [IO.File]::ReadAllText($config)
             return $text -match 'weather_city' -and $text -match 'max_sentences' -and $text -match 'run my morning briefing' -and $text -match 'what did I miss'
         }
+        39 {
+            $config = Join-Path $Paths.ProjectRoot 'poller.json'
+            $poller = Join-Path $Root 'dashboard\private-services-poller.py'
+            if (-not (Test-Path -LiteralPath $config -PathType Leaf) -or -not (Test-Path -LiteralPath $poller -PathType Leaf)) { return $false }
+            $text = [IO.File]::ReadAllText($config); $pollerText = [IO.File]::ReadAllText($poller)
+            return $text -match 'max_age_minutes.*25' -and $text -match 'max_calls_per_run.*2' -and $pollerText -match 'def is_stale' -and $pollerText -match 'os.replace'
+        }
         default { return $false }
     }
 }

@@ -79,4 +79,13 @@ Describe 'Dashboard contract helpers' {
         Write-JarvisBriefingConfig $path 'Greenwood'
         (Get-Content $path -Raw) | Should Match 'run my morning briefing'
     }
+
+    It 'installs the bounded private-services poller contract' {
+        $module = Join-Path $PSScriptRoot '..\installer\lib\poller.psm1'
+        Import-Module $module -Force
+        $project = Join-Path $TestDrive 'poller'
+        Install-JarvisPoller $project (Join-Path $PSScriptRoot '..\installer')
+        (Get-Content (Join-Path $project 'poller.json') -Raw) | Should Match 'max_calls_per_run'
+        (Get-Content (Join-Path $PSScriptRoot '..\installer\dashboard\private-services-poller.py') -Raw) | Should Match 'def is_stale'
+    }
 }
