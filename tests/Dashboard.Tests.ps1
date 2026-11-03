@@ -50,4 +50,15 @@ Describe 'Dashboard contract helpers' {
         $paths = [pscustomobject]@{ ProjectRoot = $TestDrive; HermesHome = (Join-Path $TestDrive 'hermes'); StateRoot = (Join-Path $TestDrive 'state') }
         Test-JarvisStepPostCheck -Number 35 -Paths $paths -Root (Join-Path $PSScriptRoot '..\installer') -DryRun:$false | Should Be $true
     }
+
+    It 'records Composio as pending owner with the exact read allowlist' {
+        $module = Join-Path $PSScriptRoot '..\installer\lib\composio.psm1'
+        Import-Module $module -Force
+        $project = Join-Path $TestDrive 'composio'
+        Install-JarvisComposio $project
+        $text = Get-Content (Join-Path $project 'composio-state.json') -Raw
+        $text | Should Match 'pending-owner'
+        $text | Should Match 'GMAIL_FETCH_EMAILS'
+        $text | Should Match 'GOOGLECALENDAR_EVENTS_LIST'
+    }
 }

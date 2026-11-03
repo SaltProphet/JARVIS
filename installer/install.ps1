@@ -172,7 +172,7 @@ for ($n = $start; $n -le $end; $n++) {
         33 { Show-Action 'Use the repository dashboard conversation overlay and cancellable microphone lifecycle; no model code generation required' }
         34 { Show-Action 'Use repository owner greeting, keyboard keycaps, and text-input-safe shortcuts; no model code generation required' }
         35 { Show-Action 'Use repository append-only dictation pause, send clearing, and upload fallback; no model code generation required' }
-        36 { if ($WithComposio) { Show-Action 'Install Composio and pause for owner login and two browser links' } else { Show-Action 'Composio skipped by switch' } }
+        36 { if (-not $DryRun) { Install-JarvisComposio $paths.ProjectRoot }; Show-Action 'Composio local state prepared; owner login and Gmail/Calendar OAuth remain pending-owner' }
         37 { Show-Action 'Install private-service allowlist and DEV/RESEARCH deny hooks' }
         38 { if (-not $DryRun) { Write-JarvisBriefingConfig (Join-Path $paths.ProjectRoot 'briefing.json') $form.weather_city }; Invoke-JarvisStepAction -Number 38 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
         39 { Show-Action 'Install throttled private-services poller and stale cache chips' }

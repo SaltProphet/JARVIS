@@ -171,6 +171,12 @@ function Test-JarvisStepPostCheck {
             $script = [IO.File]::ReadAllText((Join-Path $dashboard 'script.js'))
             return $index -match 'dictation-pause' -and $index -match 'Upload fallback' -and $conversation -match 'pauseDictation' -and $conversation -match 'dictationPaused' -and $script -match 'input\.value\s*='
         }
+        36 {
+            $state = Join-Path $Paths.ProjectRoot 'composio-state.json'
+            if (-not (Test-Path -LiteralPath $state -PathType Leaf)) { return $false }
+            $text = [IO.File]::ReadAllText($state)
+            return $text -match 'pending-owner' -and $text -match 'GMAIL_FETCH_EMAILS' -and $text -match 'GOOGLECALENDAR_EVENTS_LIST'
+        }
         default { return $false }
     }
 }
