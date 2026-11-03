@@ -59,11 +59,7 @@ for ($n = $start; $n -le $end; $n++) {
         $ready = Test-JarvisOllamaReady -Processes $servers -Tags $tags
         if (-not $ready.Ready) { throw $ready.Message }
     }
-    if ($n -gt 14) { throw "Step $n not implemented: the current milestone stops after step 14." }
-    if ($n -eq 15) {
-        if (-not (Test-JarvisPortFree -Port 8899)) { throw 'Port 8899 must be free before dashboard installation.' }
-        if (-not $DryRun -and -not (Test-JarvisRequiredProcesses)) { throw 'Paperclip, Postgres, and Ollama must remain running during installation.' }
-    }
+    if ($n -gt 18) { throw "Step $n not implemented: the current milestone stops after step 18." }
     switch ($n) {
         1 { if (-not $DryRun) { foreach ($f in @('USER.md','MEMORY.md')) { Backup-JarvisFile (Join-Path $paths.HermesHome "memories\$f") (Join-Path $paths.StateRoot 'backups') -RelativeTo $paths.HermesHome -UndoPath $undoPath | Out-Null }; Write-JarvisMemoryEntry (Join-Path $paths.HermesHome 'memories\USER.md') "$($form.name) works as: $($form.work). Time zone: $($form.timezone). Hours: $($form.hours). Weather city: $($form.weather_city)."; Write-JarvisMemoryEntry (Join-Path $paths.HermesHome 'memories\MEMORY.md') "JARVIS is chief of staff. Top priority: $($form.priority)." } }
         2 { if (-not $DryRun) { Backup-JarvisFile (Join-Path $paths.HermesHome 'memories\USER.md') (Join-Path $paths.StateRoot 'backups') -RelativeTo $paths.HermesHome -UndoPath $undoPath | Out-Null; Write-JarvisMemoryEntry (Join-Path $paths.HermesHome 'memories\USER.md') "Interview answers: $($form.interview -join ' | ')`nOpen questions: none recorded by installer." } }
@@ -139,10 +135,26 @@ for ($n = $start; $n -le $end; $n++) {
                 Add-JarvisActivity $logPath 'DEV' 'step=14; survey=completed; evidence=step-14-survey.json' 'completed'
             }
         }
-        15 { if (-not $DryRun) { Install-JarvisDashboardFiles $paths.ProjectRoot (Join-Path $root 'dashboard'); Register-JarvisDashboardTask $paths.ProjectRoot } }
-        16 { Invoke-JarvisStepAction -Number 16 -Paths $paths -Root $root -Form $form -DryRun:$DryRun }
-        17 { Invoke-JarvisStepAction -Number 17 -Paths $paths -Root $root -Form $form -DryRun:$DryRun }
-        18 { if (-not $DryRun) { Copy-Item (Join-Path $root 'dashboard\jarvis-backup.ps1') (Join-Path $paths.ProjectRoot 'jarvis-backup.ps1') -Force } }
+        15 {
+            if ($DryRun) { Show-Action 'Verify required processes and free port 8899; install loopback dashboard runtime and recovery task' }
+            else {
+                $runtime = Resolve-JarvisDashboardPython -HermesHome $paths.HermesHome
+                Install-JarvisDashboardRuntime -ProjectRoot $paths.ProjectRoot -DashboardRoot (Join-Path $root 'dashboard') -BackupRoot $paths.BackupRoot -UndoPath $undoPath -Runtime $runtime
+                Register-JarvisDashboardTask -ProjectRoot $paths.ProjectRoot -PythonExecutable $runtime.Executable -BackupRoot $paths.BackupRoot -UndoPath $undoPath | Out-Null
+            }
+        }
+        16 {
+            if ($DryRun) { Show-Action 'Install the bundled original template; owner upload remains available at /upload' }
+            else { Install-JarvisDashboardTemplate -ProjectRoot $paths.ProjectRoot -DashboardRoot (Join-Path $root 'dashboard') -BackupRoot $paths.BackupRoot -UndoPath $undoPath }
+        }
+        17 {
+            if ($DryRun) { Show-Action 'Install split seven-view dashboard shell while preserving /template' }
+            else { Install-JarvisDashboardShell -ProjectRoot $paths.ProjectRoot -DashboardRoot (Join-Path $root 'dashboard') -BackupRoot $paths.BackupRoot -UndoPath $undoPath }
+        }
+        18 {
+            if ($DryRun) { Show-Action 'Install backup protocol and create the v0.1 pre-wiring baseline' }
+            else { Install-JarvisDashboardBackup -ProjectRoot $paths.ProjectRoot -DashboardRoot (Join-Path $root 'dashboard') -BackupRoot $paths.BackupRoot -UndoPath $undoPath -StateRoot $paths.StateRoot | Out-Null }
+        }
         23 { if (-not $DryRun) { Install-JarvisComms $paths.ProjectRoot }; Invoke-JarvisStepAction -Number 23 -Paths $paths -Root $root -Form $form -DryRun:$DryRun }
         24 { if ($WithSerpApi) { Invoke-JarvisStepAction -Number 24 -Paths $paths -Root $root -Form $form -DryRun:$DryRun } else { Show-Action 'SerpApi skipped by switch' } }
         25 { if ($WithSerpApi -and -not $DryRun) { Install-JarvisResearch $paths.ProjectRoot (Join-Path $paths.HermesHome 'profiles\research') -WithSerpApi } }

@@ -1,1 +1,47 @@
-<!doctype html><meta charset="utf-8"><title>JARVIS template upload</title><style>body{font:16px system-ui;max-width:700px;margin:10vh auto;background:#061016;color:#dce9ee;padding:24px}label{display:block;border:1px dashed #67e8d1;padding:50px;text-align:center}#status{margin-top:20px}</style><h1>Receive the dashboard template</h1><label>Choose files<input id="files" type="file" multiple accept=".html,.png,.jpg,.jpeg,.webp,.svg"></label><div id="status"></div><script>files.onchange=async()=>{for(const f of files.files){const r=await new Promise((ok,no)=>{const x=new FileReader;x.onload=()=>ok(x.result);x.onerror=no;x.readAsDataURL(f)});const res=await fetch('/api/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:f.name,data:r})});status.innerHTML+=`<p>${f.name}: ${res.ok?'saved':'failed'}</p>`}}</script>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>JARVIS template upload</title>
+  <style>
+    body{font:16px system-ui;max-width:760px;margin:8vh auto;background:#061016;color:#dce9ee;padding:24px}
+    #drop{display:block;border:1px dashed #67e8d1;padding:52px;text-align:center;cursor:pointer}
+    #drop.dragover{background:#102d31;border-style:solid}input{position:absolute;left:-10000px}
+    .row{display:grid;grid-template-columns:1fr auto auto;gap:12px;padding:10px 0;border-bottom:1px solid #20353d}
+    .ok{color:#67e8d1}.error{color:#ff9b8f}#banner{padding:14px;background:#102d31;margin-top:18px}
+  </style>
+</head>
+<body>
+  <h1>Receive dashboard files</h1>
+  <label id="drop">Drop files here or click to choose<input id="files" type="file" multiple accept=".html,.png,.jpg,.jpeg,.webp,.svg"></label>
+  <div id="rows" aria-live="polite"></div>
+  <h2>Checklist</h2>
+  <p id="template-check">[ ] jarvis-dashboard-template.html</p>
+  <div id="banner" hidden>Template received - return to DEV's topic and continue.</div>
+  <script>
+    const drop = document.getElementById('drop');
+    const picker = document.getElementById('files');
+    const rows = document.getElementById('rows');
+    async function upload(file) {
+      const row = document.createElement('div'); row.className = 'row';
+      const name = document.createElement('span'); name.textContent = file.name;
+      const size = document.createElement('span'); size.textContent = `${file.size} bytes`;
+      const status = document.createElement('span'); status.textContent = 'uploading...';
+      row.append(name, size, status); rows.append(row);
+      try {
+        const data = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file); });
+        const response = await fetch('/api/upload', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name: file.name, data})});
+        const result = await response.json(); if (!response.ok) throw new Error(result.error || 'upload failed');
+        status.textContent = 'saved'; status.className = 'ok';
+        if (result.filename === 'jarvis-dashboard-template.html') { document.getElementById('template-check').textContent = '[x] jarvis-dashboard-template.html'; document.getElementById('banner').hidden = false; }
+      } catch (error) { status.textContent = `failed: ${error.message}`; status.className = 'error'; }
+    }
+    async function uploadAll(files) { for (const file of files) await upload(file); }
+    picker.addEventListener('change', () => uploadAll(picker.files));
+    drop.addEventListener('dragover', event => { event.preventDefault(); drop.classList.add('dragover'); });
+    drop.addEventListener('dragleave', () => drop.classList.remove('dragover'));
+    drop.addEventListener('drop', event => { event.preventDefault(); drop.classList.remove('dragover'); uploadAll(event.dataTransfer.files); });
+  </script>
+</body>
+</html>

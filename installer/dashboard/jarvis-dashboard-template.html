@@ -1,10 +1,56 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>JARVIS Mission Control</title><link rel="icon" href="/favicon.svg"><script>window.__PORTRAITS__={default:'JV',dev:'DV',research:'RS',assistant:'AS'};window.__AV__=window.__PORTRAITS__;function AV(k){return window.__AV__[k]||'?';}</script>
-<style>/* original template styling is split by the installer */
-:root{color-scheme:dark;--ink:#dce9ee;--muted:#78909a;--line:#20353d;--glow:#67e8d1;--panel:#0b171d;--hot:#ffd28a}*{box-sizing:border-box}body{margin:0;background:#061016;color:var(--ink);font:14px system-ui,sans-serif}header{display:flex;justify-content:space-between;align-items:center;padding:18px 24px;border-bottom:1px solid var(--line);letter-spacing:.16em;text-transform:uppercase;font:11px ui-monospace,monospace}.brand{color:var(--glow);font-size:18px}main{max-width:1280px;margin:auto;padding:28px 24px}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px}.tabs button{background:transparent;color:var(--muted);border:1px solid var(--line);padding:9px 13px;border-radius:4px;cursor:pointer}.tabs button.active{color:var(--glow);border-color:var(--glow)}.grid{display:grid;grid-template-columns:1.3fr .7fr;gap:16px}.card{background:linear-gradient(145deg,#0d1c23,#091319);border:1px solid var(--line);padding:20px;border-radius:8px;min-height:150px}.hero{min-height:330px;display:grid;place-items:center;text-align:center}.orb{width:180px;height:180px;border-radius:50%;border:1px solid #4abfae;box-shadow:0 12px 30px #0008,inset 0 0 18px #153b3b;display:grid;place-items:center;color:var(--glow);font:42px ui-monospace,monospace}.crew{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}.face{padding:10px 14px;background:#10252c;border:1px solid var(--line);border-radius:4px;color:var(--ink)}.eyebrow{color:var(--muted);font:11px ui-monospace,monospace;letter-spacing:.18em;text-transform:uppercase}.metric{font-size:34px;margin-top:12px}.feed{display:grid;gap:8px}.feed div{background:#0f242b;padding:7px 10px;color:#b9c9cc}.view{display:none}.view.active{display:block}@media(max-width:700px){header{padding:14px}.grid{grid-template-columns:1fr}main{padding:18px 14px}.metric{font-size:28px}.hero{min-height:280px}}
-/* ==================== TEMPLATE SHIM START ==================== */
-window.__TEMPLATE__=true;const DEMO_STATE={};const originalFetch=window.fetch;window.fetch=async()=>({json:async()=>DEMO_STATE});
-/* ==================== TEMPLATE SHIM END ==================== */
-</style></head><body><header><div class="brand">JARVIS / MISSION CONTROL</div><div>UPLINK <span id="gateway">UNKNOWN</span> <span data-version>v0.1</span></div></header><main><nav class="tabs"><button data-view="home">HOME</button><button data-view="agents">AGENTS</button><button data-view="comms">COMMS</button><button data-view="schedule">SCHEDULE</button><button data-view="library">LIBRARY</button><button data-view="docs">DOCS</button><button data-view="control">CONTROL</button></nav><section id="home" class="view active"><div class="grid"><div class="card hero"><div><div class="orb" id="orb">JV</div><p>Stand by for the next useful thing.</p><div class="crew" id="crew"></div></div></div><div class="card"><div class="eyebrow">Activity</div><div class="metric" id="tasks">-</div><p>logged tasks</p><div class="feed" id="feed"></div></div></div></section><section id="agents" class="view"><div class="card"><div class="eyebrow">Crew dossier</div><div id="agent-list"></div></div></section><section id="comms" class="view"><div class="card"><div class="eyebrow">Conversation</div><textarea id="message" rows="5" placeholder="Ask the selected profile..."></textarea><button id="send">Send</button><pre id="reply"></pre></div></section><section id="schedule" class="view"><div class="card"><div class="eyebrow">Schedule</div><p>No scheduled jobs yet. Your crew adds them as it takes on recurring work.</p></div></section><section id="library" class="view"><div class="card"><div class="eyebrow">Library</div><div id="library-list"></div></div></section><section id="docs" class="view"><div class="card"><div class="eyebrow">Manual</div><pre id="docs-body">Loading manual...</pre></div></section><section id="control" class="view"><div class="card"><div class="eyebrow">Control</div><p>Local voice and model controls are available after their services pass verification.</p></div></section></main><script id="docs-seed">Operate from the seven tabs. Home is the live pulse. Agents shows the crew. Comms is explicit-send only. Control shows available model and voice routes.</script><script>
-function render(s){document.querySelector('[data-version]').textContent=s.version||'—';document.getElementById('gateway').textContent=s.gateway?.state||'UNKNOWN';document.getElementById('tasks').textContent=s.crew.reduce((n,a)=>n+(a.tasks||0),0)||'—';document.getElementById('crew').innerHTML=s.crew.map(a=>`<span class="face" title="${a.role}">${AV(a.key)} ${a.name}</span>`).join('');document.getElementById('agent-list').innerHTML=s.crew.map(a=>`<p><b>${a.name}</b> · ${a.role} · ${a.tasks||0} logged tasks</p>`).join('');document.getElementById('feed').innerHTML=(s.ops||[]).slice(0,6).map(o=>`<div>${o.agent}: ${o.op}</div>`).join('')||'<div>No activity yet.</div>'}
-async function load(){const s=await fetch('/api/state').then(r=>r.json());render(s);const e=new EventSource('/events');e.addEventListener('state',x=>render(JSON.parse(x.data)));fetch('/api/content').then(r=>r.json()).then(x=>document.getElementById('library-list').textContent=`${x.total} documents across four shelves.`);fetch('/docs.md').then(r=>r.text()).then(x=>document.getElementById('docs-body').textContent=x)}
-</script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>JARVIS Mission Control Template</title>
+  <link rel="icon" href="/favicon.svg">
+  <script>
+    window.__PORTRAITS__ = {default: 'JV', dev: 'DV', research: 'RS', assistant: 'AS'};
+    window.__AV__ = window.__PORTRAITS__;
+    function AV(key) { return window.__AV__[key] || '?'; }
+  </script>
+  <style>
+    :root{color-scheme:dark;--ink:#dce9ee;--muted:#78909a;--line:#20353d;--glow:#67e8d1}
+    *{box-sizing:border-box}body{margin:0;background:#061016;color:var(--ink);font:14px system-ui,sans-serif}
+    header{display:flex;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--line);font:11px ui-monospace,monospace;letter-spacing:.16em;text-transform:uppercase}
+    .brand{color:var(--glow);font-size:18px}main{max-width:1280px;margin:auto;padding:28px 24px}
+    .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px}.tabs button{background:transparent;color:var(--muted);border:1px solid var(--line);padding:9px 13px}
+    .grid{display:grid;grid-template-columns:1.3fr .7fr;gap:16px}.card{background:#0b171d;border:1px solid var(--line);padding:20px;min-height:150px}
+    .hero{min-height:330px;display:grid;place-items:center;text-align:center}.orb{width:180px;height:180px;border-radius:50%;border:1px solid var(--glow);display:grid;place-items:center;color:var(--glow);font:42px ui-monospace,monospace}
+    .view{display:none}.view.active{display:block}@media(max-width:700px){.grid{grid-template-columns:1fr}main{padding:18px 14px}}
+  </style>
+  <script>
+    /* ==================== TEMPLATE SHIM START ==================== */
+    window.__TEMPLATE__=true;
+    const DEMO_STATE={crew:[],ops:[],gateway:{state:'template'},version:'v0.1'};
+    const originalFetch=window.fetch;
+    window.fetch=async()=>({ok:true,json:async()=>DEMO_STATE,text:async()=>''});
+    window.EventSource=class{addEventListener(){}};
+    /* ==================== TEMPLATE SHIM END ==================== */
+  </script>
+</head>
+<body>
+  <header><div class="brand">JARVIS / MISSION CONTROL</div><div>UPLINK <span id="gateway">TEMPLATE</span></div></header>
+  <main>
+    <nav class="tabs"><button data-view="home">HOME</button><button data-view="agents">AGENTS</button><button data-view="comms">COMMS</button><button data-view="schedule">SCHEDULE</button><button data-view="library">LIBRARY</button><button data-view="docs">DOCS</button><button data-view="control">CONTROL</button></nav>
+    <section id="home" class="view active"><div class="grid"><div class="card hero"><div class="orb">JV</div></div><div class="card">Original design template</div></div></section>
+    <section id="agents" class="view"><div class="card">Crew dossier template</div></section>
+    <section id="comms" class="view"><div class="card">Conversation template</div></section>
+    <section id="schedule" class="view"><div class="card">Schedule template</div></section>
+    <section id="library" class="view"><div class="card">Library template</div></section>
+    <section id="docs" class="view"><div class="card">Manual template</div></section>
+    <section id="control" class="view"><div class="card">Control template</div></section>
+  </main>
+  <script id="docs-seed">Operate from the seven tabs. Home is the live pulse. Comms is explicit-send only.</script>
+  <script>
+    fetch('/api/state').then(response => response.json()).then(state => {
+      document.getElementById('gateway').textContent = state.gateway.state.toUpperCase();
+    });
+    document.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => {
+      document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
+      document.getElementById(button.dataset.view).classList.add('active');
+    }));
+  </script>
+</body>
+</html>

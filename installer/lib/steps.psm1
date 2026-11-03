@@ -95,6 +95,51 @@ function Test-JarvisStepPostCheck {
             if ($row.agent_name -ne 'DEV' -or $row.status -ne 'completed' -or $row.task_description -ne 'step=14; survey=completed; evidence=step-14-survey.json') { return $false }
             return (Test-JarvisDataSurveyEvidence -Path (Join-Path $Paths.StateRoot 'step-14-survey.json'))
         }
+        15 {
+            foreach ($file in @('server.py','upload.html','version.txt','dashboard-runtime.json','dashboard.task.xml')) {
+                if (-not (Test-Path -LiteralPath (Join-Path $Paths.ProjectRoot $file) -PathType Leaf)) { return $false }
+            }
+            if ((Read-JarvisUtf8Text (Join-Path $Paths.ProjectRoot 'version.txt')).Trim() -ne 'v0.1') { return $false }
+            if (-not (Test-JarvisDashboardTaskXml -Path (Join-Path $Paths.ProjectRoot 'dashboard.task.xml') -RuntimePath (Join-Path $Paths.ProjectRoot 'dashboard-runtime.json') -ProjectRoot $Paths.ProjectRoot)) { return $false }
+            if (-not (Test-JarvisDashboardTaskRegistered)) { return $false }
+            return Test-JarvisDashboardRuntime -ProjectRoot $Paths.ProjectRoot
+        }
+        16 {
+            $template = Join-Path $Paths.ProjectRoot 'jarvis-dashboard-template.html'
+            if (-not (Test-Path -LiteralPath $template -PathType Leaf)) { return $false }
+            $text = Read-JarvisUtf8Text $template
+            return $text -match 'window\.__TEMPLATE__\s*=\s*true' -and $text -match 'TEMPLATE SHIM START' -and $text -match '<script' -and $text -notmatch 'data-version'
+        }
+        17 {
+            foreach ($file in @('index.html','styles.css','script.js','favicon.svg')) {
+                if (-not (Test-Path -LiteralPath (Join-Path $Paths.ProjectRoot $file) -PathType Leaf)) { return $false }
+            }
+            $index = Read-JarvisUtf8Text (Join-Path $Paths.ProjectRoot 'index.html')
+            if ($index -match '__TEMPLATE__' -or $index -notmatch 'data-version') { return $false }
+            foreach ($view in @('home','agents','comms','schedule','library','docs','control')) {
+                if ($index -notmatch ('id=["'']' + $view + '["'']')) { return $false }
+            }
+            return $true
+        }
+        18 {
+            $recordPath = Join-Path $Paths.StateRoot 'step-18-backup.json'
+            if (-not (Test-Path -LiteralPath (Join-Path $Paths.ProjectRoot 'jarvis-backup.ps1') -PathType Leaf) -or -not (Test-Path -LiteralPath $recordPath -PathType Leaf)) { return $false }
+            try {
+                $record = Read-JarvisUtf8Text $recordPath | ConvertFrom-Json
+                if ($record.note -ne 'pre-wiring baseline' -or -not (Test-Path -LiteralPath $record.snapshot -PathType Container)) { return $false }
+                $manifestPath = Join-Path $record.snapshot 'MANIFEST'
+                if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf) -or -not (Test-Path -LiteralPath (Join-Path $record.snapshot 'restore.ps1') -PathType Leaf)) { return $false }
+                $manifest = Read-JarvisUtf8Text $manifestPath | ConvertFrom-Json
+                if ($manifest.note -ne 'pre-wiring baseline') { return $false }
+                foreach ($file in @($manifest.files)) {
+                    $source = Join-Path $Paths.ProjectRoot $file
+                    $backup = Join-Path $record.snapshot $file
+                    if (-not (Test-Path -LiteralPath $source -PathType Leaf) -or -not (Test-Path -LiteralPath $backup -PathType Leaf)) { return $false }
+                    if ([Convert]::ToBase64String([IO.File]::ReadAllBytes($source)) -cne [Convert]::ToBase64String([IO.File]::ReadAllBytes($backup))) { return $false }
+                }
+                return @($manifest.files).Count -ge 6
+            } catch { return $false }
+        }
         default { return $false }
     }
 }
@@ -107,6 +152,10 @@ function Test-JarvisStepPreCheck {
         1 { return Test-Path (Join-Path $Paths.HermesHome 'memories') }
         5 { return Test-Path $Paths.HermesHome }
         7 { return Test-Path (Join-Path $Paths.HermesHome '.env') }
+        15 { return (Test-JarvisRequiredProcesses) -and (Test-JarvisPortFree -Port 8899) }
+        16 { return Test-JarvisStepPostCheck -Number 15 -Paths $Paths -Root $PSScriptRoot }
+        17 { return Test-JarvisStepPostCheck -Number 16 -Paths $Paths -Root $PSScriptRoot }
+        18 { return Test-JarvisStepPostCheck -Number 17 -Paths $Paths -Root $PSScriptRoot }
         default { return $true }
     }
 }

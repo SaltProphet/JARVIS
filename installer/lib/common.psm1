@@ -176,7 +176,11 @@ function Backup-JarvisFile {
     $destination = Join-Path $target $relative
     New-Item -ItemType Directory -Force -Path (Split-Path $destination -Parent) | Out-Null
     Copy-Item -LiteralPath $Path -Destination $destination -Force
-    if ($UndoPath) { Write-JarvisUndo -Path $UndoPath -Line "Copy-Item -LiteralPath '$destination' -Destination '$Path' -Force" }
+    if ($UndoPath) {
+        $safeDestination = $destination.Replace("'", "''")
+        $safePath = $Path.Replace("'", "''")
+        Write-JarvisUndo -Path $UndoPath -Line "Copy-Item -LiteralPath '$safeDestination' -Destination '$safePath' -Force"
+    }
     $destination
 }
 
@@ -185,6 +189,33 @@ function Write-JarvisUndo {
     $parent = Split-Path $Path -Parent
     New-Item -ItemType Directory -Force -Path $parent | Out-Null
     Add-Content -LiteralPath $Path -Value $Line -Encoding UTF8
+}
+
+function Invoke-JarvisUndoFile {
+    param([string]$Path, [string]$ScheduledTasks = $(if ($env:JARVIS_SCHTASKS) { $env:JARVIS_SCHTASKS } else { 'schtasks.exe' }))
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return }
+    $lines = @(Get-Content -LiteralPath $Path | Where-Object { $_.Trim() -and -not $_.Trim().StartsWith('#') })
+    [array]::Reverse($lines)
+    foreach ($line in $lines) {
+        if ($line -match "^Copy-Item -LiteralPath '((?:''|[^'])*)' -Destination '((?:''|[^'])*)' -Force$") {
+            $source = $Matches[1].Replace("''", "'")
+            $destination = $Matches[2].Replace("''", "'")
+            if (Test-Path -LiteralPath $source -PathType Leaf) { Copy-Item -LiteralPath $source -Destination $destination -Force }
+        } elseif ($line -match "^Remove-Item -LiteralPath '((?:''|[^'])*)' -Force -ErrorAction SilentlyContinue$") {
+            $target = $Matches[1].Replace("''", "'")
+            if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue }
+        } elseif ($line -eq "Unregister-JarvisScheduledTask -TaskName 'JARVIS Mission Control'") {
+            & $ScheduledTasks /Delete /TN 'JARVIS Mission Control' /F | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw "Could not remove the JARVIS Mission Control scheduled task (exit code $LASTEXITCODE)." }
+        } elseif ($line -match "^Register-JarvisScheduledTask -TaskName 'JARVIS Mission Control' -XmlPath '((?:''|[^'])*)'$") {
+            $xmlPath = $Matches[1].Replace("''", "'")
+            if (-not (Test-Path -LiteralPath $xmlPath -PathType Leaf)) { throw "Scheduled task undo XML is missing: $xmlPath" }
+            & $ScheduledTasks /Create /TN 'JARVIS Mission Control' /XML $xmlPath /F | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw "Could not restore the JARVIS Mission Control scheduled task (exit code $LASTEXITCODE)." }
+        } else {
+            throw "Unsupported undo entry: $line"
+        }
+    }
 }
 
 Export-ModuleMember -Function *-Jarvis*
