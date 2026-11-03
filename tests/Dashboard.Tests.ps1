@@ -105,4 +105,10 @@ Describe 'Dashboard contract helpers' {
         $text = Get-Content (Join-Path $path 'access.json') -Raw
         $text | Should Match '127.0.0.1:8899'; $text | Should Match 'funnel.*false'; $text | Should Match 'pending-owner'
     }
+
+    It 'defines the final verification runtime artifact set' {
+        $verify = Get-Content (Join-Path $PSScriptRoot '..\installer\lib\verify.psm1') -Raw
+        $verify | Should Match 'server.py'
+        $verify | Should Match 'favicon.svg'
+    }
 }
