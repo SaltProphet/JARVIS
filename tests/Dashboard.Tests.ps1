@@ -45,4 +45,9 @@ Describe 'Dashboard contract helpers' {
         $paths = [pscustomobject]@{ ProjectRoot = $TestDrive; HermesHome = (Join-Path $TestDrive 'hermes'); StateRoot = (Join-Path $TestDrive 'state') }
         Test-JarvisStepPostCheck -Number 34 -Paths $paths -Root (Join-Path $PSScriptRoot '..\installer') -DryRun:$false | Should Be $true
     }
+
+    It 'verifies the repository dictation fallback artifact for step 35' {
+        $paths = [pscustomobject]@{ ProjectRoot = $TestDrive; HermesHome = (Join-Path $TestDrive 'hermes'); StateRoot = (Join-Path $TestDrive 'state') }
+        Test-JarvisStepPostCheck -Number 35 -Paths $paths -Root (Join-Path $PSScriptRoot '..\installer') -DryRun:$false | Should Be $true
+    }
 }

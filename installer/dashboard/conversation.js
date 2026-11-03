@@ -9,6 +9,7 @@ class ConversationState {
     this.selectedAgent = 'default';
     this.transcript = '';
     this.dictationGeneration = 0;
+    this.dictationPaused = false;
   }
 
   beginListening(agent = this.selectedAgent) {
@@ -21,6 +22,7 @@ class ConversationState {
   startPushToTalk(agent = this.selectedAgent) {
     if (!this.beginListening(agent)) return null;
     this.transcript = '';
+    this.dictationPaused = false;
     this.dictationGeneration += 1;
     return this.dictationGeneration;
   }
@@ -59,8 +61,20 @@ class ConversationState {
   }
 
   acceptDictation(generation, text) {
-    if (generation !== this.dictationGeneration || (this.phase !== 'listening' && this.phase !== 'dictating')) return null;
+    if (generation !== this.dictationGeneration || this.dictationPaused || (this.phase !== 'listening' && this.phase !== 'dictating')) return null;
     return this.appendTranscript(text);
+  }
+
+  pauseDictation() {
+    if (this.phase !== 'listening' && this.phase !== 'dictating') return false;
+    this.dictationPaused = true;
+    return true;
+  }
+
+  resumeDictation() {
+    if (!this.dictationPaused) return false;
+    this.dictationPaused = false;
+    return true;
   }
 
   finishPushToTalk(generation) {

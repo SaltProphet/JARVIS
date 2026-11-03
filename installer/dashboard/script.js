@@ -97,6 +97,8 @@ function stopSpeechTurn(generation = conversation?.dictationGeneration) {
 function installConversationControls() {
   const orb = document.getElementById('orb');
   if (!orb) return;
+  const pause = document.getElementById('dictation-pause');
+  if (pause) pause.onclick = () => { if (conversation?.dictationPaused) { conversation.resumeDictation(); pause.textContent = 'Pause dictation'; } else if (conversation?.pauseDictation()) pause.textContent = 'Resume dictation'; };
   orb.setAttribute('role', 'button');
   orb.tabIndex = 0;
   orb.onclick = () => conversation?.phase === 'listening' ? stopSpeechTurn() : beginSpeechTurn();

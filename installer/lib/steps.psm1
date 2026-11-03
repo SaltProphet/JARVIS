@@ -164,6 +164,13 @@ function Test-JarvisStepPostCheck {
             $script = [IO.File]::ReadAllText((Join-Path $dashboard 'script.js'))
             return $index -match 'owner-greeting' -and $script -match '/api/owner' -and $script -match '<kbd>' -and $script -match 'isTextControl'
         }
+        35 {
+            $dashboard = Join-Path $Root 'dashboard'
+            $index = [IO.File]::ReadAllText((Join-Path $dashboard 'index.html'))
+            $conversation = [IO.File]::ReadAllText((Join-Path $dashboard 'conversation.js'))
+            $script = [IO.File]::ReadAllText((Join-Path $dashboard 'script.js'))
+            return $index -match 'dictation-pause' -and $index -match 'Upload fallback' -and $conversation -match 'pauseDictation' -and $conversation -match 'dictationPaused' -and $script -match 'input\.value\s*='
+        }
         default { return $false }
     }
 }
