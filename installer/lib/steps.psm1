@@ -158,6 +158,12 @@ function Test-JarvisStepPostCheck {
             $scriptText = [IO.File]::ReadAllText($script)
             return $indexText -match 'conversation-overlay' -and $indexText -match 'conversation-transcript' -and $scriptText -match 'renderTranscript' -and $scriptText -match 'stopRecognition' -and $scriptText -match 'jarvisRestTimer'
         }
+        34 {
+            $dashboard = Join-Path $Root 'dashboard'
+            $index = [IO.File]::ReadAllText((Join-Path $dashboard 'index.html'))
+            $script = [IO.File]::ReadAllText((Join-Path $dashboard 'script.js'))
+            return $index -match 'owner-greeting' -and $script -match '/api/owner' -and $script -match '<kbd>' -and $script -match 'isTextControl'
+        }
         default { return $false }
     }
 }

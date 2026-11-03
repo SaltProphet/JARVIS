@@ -170,7 +170,7 @@ for ($n = $start; $n -le $end; $n++) {
         31 { Invoke-JarvisStepAction -Number 31 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
         32 { Show-Action 'Use the repository dashboard fixed-timing push-to-talk state machine; no model code generation required' }
         33 { Show-Action 'Use the repository dashboard conversation overlay and cancellable microphone lifecycle; no model code generation required' }
-        34 { Invoke-JarvisStepAction -Number 34 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
+        34 { Show-Action 'Use repository owner greeting, keyboard keycaps, and text-input-safe shortcuts; no model code generation required' }
         35 { Invoke-JarvisStepAction -Number 35 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
         36 { if ($WithComposio) { Show-Action 'Install Composio and pause for owner login and two browser links' } else { Show-Action 'Composio skipped by switch' } }
         37 { Show-Action 'Install private-service allowlist and DEV/RESEARCH deny hooks' }

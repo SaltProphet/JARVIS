@@ -40,4 +40,9 @@ Describe 'Dashboard contract helpers' {
         $paths = [pscustomobject]@{ ProjectRoot = $TestDrive; HermesHome = (Join-Path $TestDrive 'hermes'); StateRoot = (Join-Path $TestDrive 'state') }
         Test-JarvisStepPostCheck -Number 33 -Paths $paths -Root (Join-Path $PSScriptRoot '..\installer') -DryRun:$false | Should Be $true
     }
+
+    It 'verifies the repository owner shortcut artifact for step 34' {
+        $paths = [pscustomobject]@{ ProjectRoot = $TestDrive; HermesHome = (Join-Path $TestDrive 'hermes'); StateRoot = (Join-Path $TestDrive 'state') }
+        Test-JarvisStepPostCheck -Number 34 -Paths $paths -Root (Join-Path $PSScriptRoot '..\installer') -DryRun:$false | Should Be $true
+    }
 }

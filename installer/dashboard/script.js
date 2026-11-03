@@ -10,7 +10,7 @@ function render(state) {
   document.querySelector('[data-version]').textContent = state.version || '—';
   document.getElementById('gateway').textContent = state.gateway?.state || 'UNKNOWN';
   document.getElementById('tasks').textContent = state.crew.reduce((n, agent) => n + (agent.tasks || 0), 0);
-  document.getElementById('crew').innerHTML = state.crew.map(agent => `<button class="face" data-agent="${escapeHtml(agent.key)}" title="${escapeHtml(agent.role)}">${escapeHtml(AV(agent.key))} ${escapeHtml(agent.name)}</button>`).join('');
+   document.getElementById('crew').innerHTML = state.crew.map((agent, index) => `<button class="face" data-agent="${escapeHtml(agent.key)}" title="${escapeHtml(agent.role)}"><kbd>${index + 1}</kbd> ${escapeHtml(AV(agent.key))} ${escapeHtml(agent.name)}</button>`).join('');
   document.getElementById('agent-list').innerHTML = state.crew.map(agent => `<p><b>${escapeHtml(agent.name)}</b> · ${escapeHtml(agent.role)} · ${agent.tasks || 0} logged tasks</p>`).join('');
   document.getElementById('feed').innerHTML = (state.ops || []).slice(0, 6).map(op => `<div>${escapeHtml(op.agent)}: ${escapeHtml(op.op)}</div>`).join('') || '<div>No activity yet.</div>';
   document.querySelectorAll('[data-agent]').forEach(button => { button.onclick = () => selectAgent(button.dataset.agent); });
@@ -110,7 +110,8 @@ function installConversationControls() {
 
 async function load() {
   const state = await fetch('/api/state').then(response => response.json());
-  render(state); installConversationControls();
+   render(state); installConversationControls();
+   fetch('/api/owner').then(response => response.json()).then(owner => { const greeting = document.getElementById('owner-greeting'); if (greeting && owner.name) greeting.textContent = ` · HELLO ${owner.name.toUpperCase()}`; });
   const events = typeof EventSource === 'function' ? new EventSource('/events') : null;
   if (events) events.addEventListener('state', event => render(JSON.parse(event.data)));
   fetch('/api/content').then(response => response.json()).then(value => { document.getElementById('library-list').textContent = `${value.total} documents across four shelves.`; });
