@@ -3,7 +3,7 @@ Set-StrictMode -Version Latest
 function Get-JarvisEnvValue {
     param([string]$EnvFile, [string]$Name)
     if (-not (Test-Path $EnvFile)) { return '' }
-    $line = Get-Content $EnvFile | Where-Object { $_ -match "^$([regex]::Escape($Name))=" } | Select-Object -First 1
+    $line = (Read-JarvisUtf8Text $EnvFile) -split "\r?\n" | Where-Object { $_ -match "^$([regex]::Escape($Name))=" } | Select-Object -First 1
     if ($line) { return ($line -split '=', 2)[1].Trim().Trim('"') }
     ''
 }
@@ -54,9 +54,9 @@ function New-JarvisTelegramTopics {
 function Write-JarvisTelegramPlugin {
     param([string]$HermesHome, [hashtable]$TopicMap, [string]$OwnerName)
     $dir = Join-Path $HermesHome 'plugins\telegram_topic_profiles'; New-Item -ItemType Directory -Force -Path $dir | Out-Null
-    @("name: telegram_topic_profiles", "version: 1.0.0", 'description: "Route Telegram forum topics to Hermes profiles."', "author: $OwnerName", 'kind: standalone') | Set-Content (Join-Path $dir 'plugin.yaml') -Encoding UTF8
-    $TopicMap | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $dir 'topics.json') -Encoding UTF8
-    @'
+    Write-JarvisUtf8Text -Path (Join-Path $dir 'plugin.yaml') -Text (@("name: telegram_topic_profiles", "version: 1.0.0", 'description: "Route Telegram forum topics to Hermes profiles."', "author: $OwnerName", 'kind: standalone') -join "`n")
+    Write-JarvisUtf8Text -Path (Join-Path $dir 'topics.json') -Text ($TopicMap | ConvertTo-Json -Depth 5)
+    $plugin = @'
 import json
 from pathlib import Path
 def _load_map():
@@ -70,7 +70,8 @@ def _route(**kwargs):
     if profile: source["profile"] = profile
 def register(ctx):
     ctx.register_hook("pre_gateway_dispatch", _route)
-'@ | Set-Content (Join-Path $dir '__init__.py') -Encoding UTF8
+'@
+    Write-JarvisUtf8Text -Path (Join-Path $dir '__init__.py') -Text $plugin
 }
 
 Export-ModuleMember -Function *-Jarvis*

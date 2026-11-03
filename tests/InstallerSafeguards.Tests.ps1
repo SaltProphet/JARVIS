@@ -63,3 +63,38 @@ Describe 'JARVIS Telegram and owner form safeguards' {
         }
     }
 }
+
+Describe 'JARVIS specialist profile encoding safeguards' {
+    It 'removes the platforms block without changing non-ASCII config bytes or adding a BOM' {
+        $hermes = Join-Path $TestDrive 'hermes'
+        $profile = Join-Path $hermes 'profiles\dev'
+        $backup = Join-Path $TestDrive 'backups'
+        New-Item -ItemType Directory -Force -Path $profile | Out-Null
+        $config = Join-Path $profile 'config.yaml'
+        $dash = [char]0x2014
+        $original = "model:`r`n  name: gpt-oss:20b`r`ndescription: em dash $dash stays`r`nplatforms:`r`n  telegram:`r`n    enabled: true`r`n"
+        Write-JarvisUtf8Text -Path $config -Text $original
+        InModuleScope common { Mock Test-JarvisHermesYaml { return $true } }
+        Invoke-JarvisSpecialistProfileCleanup -ProfileDir $profile -BackupRoot $backup -RelativeTo $hermes -Timestamp 'stamp'
+        $expected = "model:`r`n  name: gpt-oss:20b`r`ndescription: em dash $dash stays`r`n"
+        [Convert]::ToBase64String([IO.File]::ReadAllBytes($config)) | Should Be ([Convert]::ToBase64String((New-Object Text.UTF8Encoding($false)).GetBytes($expected)))
+        (Get-Content -LiteralPath $config -Encoding Byte -TotalCount 3) -join ',' | Should Not Be '239,187,191'
+        Test-Path (Join-Path $backup 'stamp\profiles\dev\config.yaml') | Should Be $true
+        $afterFirst = [Convert]::ToBase64String([IO.File]::ReadAllBytes($config))
+        Invoke-JarvisSpecialistProfileCleanup -ProfileDir $profile -BackupRoot $backup -RelativeTo $hermes -Timestamp 'second-stamp'
+        [Convert]::ToBase64String([IO.File]::ReadAllBytes($config)) | Should Be $afterFirst
+    }
+
+    It 'restores a config when Hermes rejects the cleaned YAML' {
+        $hermes = Join-Path $TestDrive 'hermes-restore'
+        $profile = Join-Path $hermes 'profiles\dev'
+        $backup = Join-Path $TestDrive 'backups-restore'
+        New-Item -ItemType Directory -Force -Path $profile | Out-Null
+        $config = Join-Path $profile 'config.yaml'
+        $original = "description: em dash $([char]0x2014) stays`nplatforms:`n  telegram:`n    enabled: true`n"
+        Write-JarvisUtf8Text -Path $config -Text $original
+        InModuleScope common { Mock Test-JarvisHermesYaml { throw 'yaml.reader.ReaderError: unacceptable character' } }
+        { Invoke-JarvisSpecialistProfileCleanup -ProfileDir $profile -BackupRoot $backup -RelativeTo $hermes -Timestamp 'restore-stamp' } | Should Throw
+        Read-JarvisUtf8Text $config | Should Be $original
+    }
+}

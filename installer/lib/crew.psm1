@@ -8,7 +8,7 @@ function Install-JarvisCrew {
         if ($DryRun) { Write-Output "CREATE PROFILE $profile with hermes profile create $profile --clone"; continue }
         if (-not (Test-Path $dir)) { & hermes profile create $profile --clone | Out-Null }
         $soul = Join-Path $TemplateRoot "SOUL-$($profile.ToUpperInvariant()).md"
-        Copy-Item $soul (Join-Path $dir 'SOUL.md') -Force
+        Write-JarvisUtf8Text -Path (Join-Path $dir 'SOUL.md') -Text (Read-JarvisUtf8Text $soul)
     }
 }
 

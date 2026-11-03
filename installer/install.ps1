@@ -65,9 +65,9 @@ for ($n = $start; $n -le $end; $n++) {
         if (-not $DryRun -and -not (Test-JarvisRequiredProcesses)) { throw 'Paperclip, Postgres, and Ollama must remain running during installation.' }
     }
     switch ($n) {
-        1 { if (-not $DryRun) { foreach ($f in @('USER.md','MEMORY.md')) { Backup-JarvisFile (Join-Path $paths.HermesHome "memories\$f") (Join-Path $paths.StateRoot 'backups') -UndoPath $undoPath | Out-Null }; Write-JarvisMemoryEntry (Join-Path $paths.HermesHome 'memories\USER.md') "$($form.name) works as: $($form.work). Time zone: $($form.timezone). Hours: $($form.hours). Weather city: $($form.weather_city)."; Write-JarvisMemoryEntry (Join-Path $paths.HermesHome 'memories\MEMORY.md') "JARVIS is chief of staff. Top priority: $($form.priority)." } }
-        2 { if (-not $DryRun) { Backup-JarvisFile (Join-Path $paths.HermesHome 'memories\USER.md') (Join-Path $paths.StateRoot 'backups') -UndoPath $undoPath | Out-Null; Write-JarvisMemoryEntry (Join-Path $paths.HermesHome 'memories\USER.md') "Interview answers: $($form.interview -join ' | ')`nOpen questions: none recorded by installer." } }
-        3 { if (-not $DryRun) { Backup-JarvisFile (Join-Path $paths.HermesHome 'memories\MEMORY.md') (Join-Path $paths.StateRoot 'backups') -UndoPath $undoPath | Out-Null; Write-JarvisMemoryEntry (Join-Path $paths.HermesHome 'memories\MEMORY.md') (Read-JarvisUtf8Text (Join-Path $root 'templates\memory-rules.md')) } }
+        1 { if (-not $DryRun) { foreach ($f in @('USER.md','MEMORY.md')) { Backup-JarvisFile (Join-Path $paths.HermesHome "memories\$f") (Join-Path $paths.StateRoot 'backups') -RelativeTo $paths.HermesHome -UndoPath $undoPath | Out-Null }; Write-JarvisMemoryEntry (Join-Path $paths.HermesHome 'memories\USER.md') "$($form.name) works as: $($form.work). Time zone: $($form.timezone). Hours: $($form.hours). Weather city: $($form.weather_city)."; Write-JarvisMemoryEntry (Join-Path $paths.HermesHome 'memories\MEMORY.md') "JARVIS is chief of staff. Top priority: $($form.priority)." } }
+        2 { if (-not $DryRun) { Backup-JarvisFile (Join-Path $paths.HermesHome 'memories\USER.md') (Join-Path $paths.StateRoot 'backups') -RelativeTo $paths.HermesHome -UndoPath $undoPath | Out-Null; Write-JarvisMemoryEntry (Join-Path $paths.HermesHome 'memories\USER.md') "Interview answers: $($form.interview -join ' | ')`nOpen questions: none recorded by installer." } }
+        3 { if (-not $DryRun) { Backup-JarvisFile (Join-Path $paths.HermesHome 'memories\MEMORY.md') (Join-Path $paths.StateRoot 'backups') -RelativeTo $paths.HermesHome -UndoPath $undoPath | Out-Null; Write-JarvisMemoryEntry (Join-Path $paths.HermesHome 'memories\MEMORY.md') (Read-JarvisUtf8Text (Join-Path $root 'templates\memory-rules.md')) } }
         4 { Invoke-JarvisStepAction -Number 4 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
         5 { Install-JarvisCrew $paths.HermesHome (Join-Path $root 'templates') $form.name -DryRun:$DryRun }
         6 { Invoke-JarvisStepAction -Number 6 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
@@ -83,18 +83,14 @@ for ($n = $start; $n -le $end; $n++) {
             if (-not $DryRun) {
                 foreach ($profile in @('dev','research','assistant')) {
                     $profileDir = Join-Path $paths.HermesHome "profiles\$profile"
-                    foreach ($file in @('config.yaml','.env')) {
-                        $target = Join-Path $profileDir $file; if (Test-Path $target) { Backup-JarvisFile $target (Join-Path $paths.StateRoot 'backups') -UndoPath $undoPath | Out-Null }
-                    }
-                    $envFile = Join-Path $profileDir '.env'; if (Test-Path $envFile) { (Get-Content $envFile | Where-Object { $_ -notmatch '^TELEGRAM_BOT_TOKEN=' }) | Set-Content $envFile -Encoding UTF8 }
-                    $configFile = Join-Path $profileDir 'config.yaml'; if (Test-Path $configFile) { $yaml = Get-Content $configFile -Raw; $yaml = [regex]::Replace($yaml, '(?ms)^platforms:\s*\n(?:^[ \t]+.*\n?)+', ''); Set-Content $configFile $yaml -Encoding UTF8 }
+                    Invoke-JarvisSpecialistProfileCleanup -ProfileDir $profileDir -BackupRoot (Join-Path $paths.StateRoot 'backups') -RelativeTo $paths.HermesHome -UndoPath $undoPath
                 }
             } else { Show-Action 'Back up specialist configs and strip Telegram channel settings' }
         }
         9 {
             if (-not $DryRun) {
-                Backup-JarvisFile (Join-Path $paths.HermesHome 'config.yaml') (Join-Path $paths.StateRoot 'backups') -UndoPath $undoPath | Out-Null
-                $telegram = Get-Content (Join-Path $paths.StateRoot 'telegram.json') -Raw | ConvertFrom-Json
+                Backup-JarvisFile (Join-Path $paths.HermesHome 'config.yaml') (Join-Path $paths.StateRoot 'backups') -RelativeTo $paths.HermesHome -UndoPath $undoPath | Out-Null
+                $telegram = Read-JarvisUtf8Text (Join-Path $paths.StateRoot 'telegram.json') | ConvertFrom-Json
                 $map = @{ chat_id = $telegram.chat_id; topics = @{} }; foreach ($p in $telegram.topics.PSObject.Properties) { $map.topics[$p.Name] = $p.Value }
                 Write-JarvisTelegramPlugin $paths.HermesHome $map $form.name
                 & hermes plugins enable telegram_topic_profiles | Out-Null; if ($LASTEXITCODE -ne 0) { throw 'Hermes plugin enable failed.' }

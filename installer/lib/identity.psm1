@@ -91,7 +91,7 @@ function Write-JarvisMemoryEntry {
     New-Item -ItemType Directory -Force -Path (Split-Path $MemoryFile -Parent) | Out-Null
     $raw = if (Test-Path $MemoryFile) { Read-JarvisUtf8Text $MemoryFile } else { $null }
     $existing = if ($null -eq $raw) { '' } else { $raw.Trim() }
-    if ($existing -notlike "*$Entry*") { Set-Content -LiteralPath $MemoryFile -Value (($existing, $Entry -join "`n§`n").Trim()) -Encoding UTF8 }
+    if ($existing -notlike "*$Entry*") { Write-JarvisUtf8Text -Path $MemoryFile -Text (($existing, $Entry -join "`n§`n").Trim()) }
 }
 
 function Invoke-JarvisAgentTurn {

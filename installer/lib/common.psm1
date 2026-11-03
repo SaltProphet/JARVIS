@@ -50,6 +50,47 @@ function Read-JarvisUtf8Text {
     [IO.File]::ReadAllText($Path, (New-Object Text.UTF8Encoding($false)))
 }
 
+function Get-JarvisHermesPython {
+    param([string]$HermesHome = $(if ($env:HERMES_HOME) { $env:HERMES_HOME } else { Join-Path $env:LOCALAPPDATA 'hermes' }))
+    $tools = Join-Path $HermesHome 'tools'
+    $python = Get-ChildItem -LiteralPath $tools -Filter 'python.exe' -Recurse -File -ErrorAction SilentlyContinue | Where-Object { (Split-Path $_.DirectoryName -Leaf) -like 'python-*' } | Sort-Object FullName -Descending | Select-Object -First 1
+    if (-not $python) { throw "Hermes bundled Python was not found under $tools." }
+    $python.FullName
+}
+
+function Test-JarvisHermesYaml {
+    param([string]$Path, [string]$PythonPath)
+    if (-not $PythonPath) { $PythonPath = Get-JarvisHermesPython }
+    $output = & $PythonPath -c "import sys, yaml; yaml.safe_load(open(sys.argv[1], encoding='utf-8'))" $Path 2>&1
+    if ($LASTEXITCODE -ne 0) { throw ($output -join [Environment]::NewLine) }
+    $true
+}
+
+function Invoke-JarvisSpecialistProfileCleanup {
+    param([string]$ProfileDir, [string]$BackupRoot, [string]$RelativeTo, [string]$Timestamp = $(Get-Date -Format 'yyyyMMdd-HHmmss'), [string]$PythonPath, [string]$UndoPath)
+    $envFile = Join-Path $ProfileDir '.env'
+    if (Test-Path -LiteralPath $envFile) {
+        $raw = Read-JarvisUtf8Text $envFile
+        $clean = [regex]::Replace($raw, '(?m)^TELEGRAM_BOT_TOKEN=.*(?:\r?\n|$)', '')
+        if ($clean -cne $raw) { Backup-JarvisFile $envFile $BackupRoot -Timestamp $Timestamp -RelativeTo $RelativeTo -UndoPath $UndoPath | Out-Null; Write-JarvisUtf8Text $envFile $clean }
+    }
+    $configFile = Join-Path $ProfileDir 'config.yaml'
+    if (Test-Path -LiteralPath $configFile) {
+        $raw = Read-JarvisUtf8Text $configFile
+        $clean = [regex]::Replace($raw, '(?ms)^platforms:\s*\n(?:^[ \t]+.*\n?)+', '')
+        if ($clean -cne $raw) {
+            $backup = Backup-JarvisFile $configFile $BackupRoot -Timestamp $Timestamp -RelativeTo $RelativeTo -UndoPath $UndoPath
+            try {
+                Write-JarvisUtf8Text $configFile $clean
+                Test-JarvisHermesYaml -Path $configFile -PythonPath $PythonPath | Out-Null
+            } catch {
+                Copy-Item -LiteralPath $backup -Destination $configFile -Force
+                throw "Hermes could not parse $configFile after step 8 cleanup: $($_.Exception.Message)"
+            }
+        }
+    }
+}
+
 function Test-JarvisOllamaReady {
     param([object[]]$Processes, [string[]]$Tags)
     if (@($Processes).Count -eq 0) { return [pscustomobject]@{ Ready = $false; Message = "Ollama isn't running. Start the Ollama app once, then rerun." } }
@@ -96,14 +137,15 @@ function Get-JarvisProgress {
 }
 
 function Backup-JarvisFile {
-    param([string]$Path, [string]$BackupRoot, [string]$Timestamp = $(Get-Date -Format 'yyyyMMdd-HHmmss'), [string]$UndoPath)
+    param([string]$Path, [string]$BackupRoot, [string]$Timestamp = $(Get-Date -Format 'yyyyMMdd-HHmmss'), [string]$UndoPath, [string]$RelativeTo)
     if (-not (Test-Path -LiteralPath $Path)) { return $null }
     $target = Join-Path $BackupRoot $Timestamp
-    New-Item -ItemType Directory -Force -Path $target | Out-Null
-    $name = Split-Path $Path -Leaf
-    Copy-Item -LiteralPath $Path -Destination (Join-Path $target $name) -Force
-    if ($UndoPath) { Write-JarvisUndo -Path $UndoPath -Line "Copy-Item -LiteralPath '$target\$name' -Destination '$Path' -Force" }
-    Join-Path $target $name
+    $relative = if ($RelativeTo) { $Path.Substring(([IO.Path]::GetFullPath($RelativeTo)).Length).TrimStart('\','/') } else { Split-Path $Path -Leaf }
+    $destination = Join-Path $target $relative
+    New-Item -ItemType Directory -Force -Path (Split-Path $destination -Parent) | Out-Null
+    Copy-Item -LiteralPath $Path -Destination $destination -Force
+    if ($UndoPath) { Write-JarvisUndo -Path $UndoPath -Line "Copy-Item -LiteralPath '$destination' -Destination '$Path' -Force" }
+    $destination
 }
 
 function Write-JarvisUndo {

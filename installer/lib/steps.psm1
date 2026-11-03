@@ -38,19 +38,19 @@ function Test-JarvisStepPostCheck {
         6 { $turn = Join-Path $Paths.StateRoot 'agent-turn-06.txt'; $text = if (Test-Path $turn) { Read-JarvisUtf8Text $turn } else { '' }; return $text -match 'JARVIS' -and $text -match 'DEV' -and $text -match 'RESEARCH' -and $text -match 'ASSISTANT' }
         7 {
             if (-not (Test-Path (Join-Path $Paths.StateRoot 'telegram.json'))) { return $false }
-            $telegram = Get-Content (Join-Path $Paths.StateRoot 'telegram.json') -Raw | ConvertFrom-Json
+             $telegram = Read-JarvisUtf8Text (Join-Path $Paths.StateRoot 'telegram.json') | ConvertFrom-Json
             return -not [string]::IsNullOrWhiteSpace([string]$telegram.chat_id) -and @($telegram.topics.PSObject.Properties).Count -eq 3
         }
         8 {
             foreach ($profile in @('dev','research','assistant')) {
                 $envFile = Join-Path $Paths.HermesHome "profiles\$profile\.env"
                 $config = Join-Path $Paths.HermesHome "profiles\$profile\config.yaml"
-                if ((Test-Path $envFile) -and (Get-Content $envFile -Raw) -match 'TELEGRAM_BOT_TOKEN=') { return $false }
-                if ((Test-Path $config) -and (Get-Content $config -Raw) -match '(?m)^platforms:') { return $false }
+                if ((Test-Path $envFile) -and (Read-JarvisUtf8Text $envFile) -match 'TELEGRAM_BOT_TOKEN=') { return $false }
+                if ((Test-Path $config) -and (Read-JarvisUtf8Text $config) -match '(?m)^platforms:') { return $false }
             }
             return $true
         }
-        9 { $config = Join-Path $Paths.HermesHome 'config.yaml'; return (Test-Path (Join-Path $Paths.HermesHome 'plugins\telegram_topic_profiles\plugin.yaml')) -and (Test-Path (Join-Path $Paths.HermesHome 'plugins\telegram_topic_profiles\topics.json')) -and (Test-Path $config) -and ((Get-Content $config -Raw) -match 'multiplex_profiles') }
+        9 { $config = Join-Path $Paths.HermesHome 'config.yaml'; return (Test-Path (Join-Path $Paths.HermesHome 'plugins\telegram_topic_profiles\plugin.yaml')) -and (Test-Path (Join-Path $Paths.HermesHome 'plugins\telegram_topic_profiles\topics.json')) -and (Test-Path $config) -and ((Read-JarvisUtf8Text $config) -match 'multiplex_profiles') }
         10 { $turn = Join-Path $Paths.StateRoot 'agent-turn-10.txt'; $text = if (Test-Path $turn) { Read-JarvisUtf8Text $turn } else { '' }; return $text -match 'DEV' -and $text -match 'RESEARCH' -and $text -match 'ASSISTANT' -and $text -match 'works|failed' }
         11 { $db = Join-Path $Paths.ProjectRoot 'agent-logs.db'; return (Test-Path $db) -and ((Get-Item $db).Length -gt 0) }
         12 {
@@ -59,7 +59,7 @@ function Test-JarvisStepPostCheck {
             if ((@('JARVIS','DEV','RESEARCH','ASSISTANT' | Where-Object { $names -contains $_ }).Count -ne 4)) { return $false }
             foreach ($profile in @('default','dev','research','assistant')) {
                 $memoryFile = if ($profile -eq 'default') { Join-Path $Paths.HermesHome 'memories\MEMORY.md' } else { Join-Path $Paths.HermesHome "profiles\$profile\memories\MEMORY.md" }
-                if (-not (Test-Path $memoryFile) -or (Get-Content $memoryFile -Raw) -notmatch 'log-task') { return $false }
+                if (-not (Test-Path $memoryFile) -or (Read-JarvisUtf8Text $memoryFile) -notmatch 'log-task') { return $false }
             }
             return $true
         }
