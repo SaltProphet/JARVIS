@@ -4,6 +4,7 @@ param(
     [ValidateRange(1,48)][int]$Step,
     [ValidateRange(1,48)][int]$From = 1,
     [ValidateRange(1,48)][int]$Through,
+    [ValidateRange(1,120)][int]$ModelTimeoutMinutes = 25,
     [switch]$Uninstall,
     [switch]$WithClaudeCode,
     [switch]$WithSerpApi,
@@ -34,10 +35,10 @@ function Invoke-Undo {
 }
 if ($Uninstall) { Invoke-Undo; exit 0 }
 
-$savedForm = if (Test-Path $inputPath) { Get-Content $inputPath -Raw | ConvertFrom-Json } else { $null }
+$savedForm = if (Test-Path $inputPath) { Read-JarvisUtf8Text $inputPath | ConvertFrom-Json } else { $null }
 $form = Complete-JarvisOwnerForm -Form $savedForm -EnvFile (Join-Path $paths.HermesHome '.env') -DryRun:$DryRun
-if (-not $DryRun -and -not (Test-JarvisOwnerForm -Form $form)) { throw 'Owner form is incomplete. Re-run interactively and provide all six interview answers before installation.' }
-if (-not (Test-Path $inputPath)) { Save-Inputs $form }
+if (-not $DryRun -and -not (Test-JarvisOwnerForm -Form $form)) { throw 'Owner form is incomplete after prompting for missing fields.' }
+Save-Inputs $form
 $progress = Get-JarvisProgress $progressPath
 $first = if ($progress.completed) { ($progress.completed | ForEach-Object {[int]$_} | Measure-Object -Maximum).Maximum + 1 } else { 1 }
 $start = if ($Step) { $Step } elseif ($From -gt $first) { $From } else { $first }
@@ -48,6 +49,16 @@ for ($n = $start; $n -le $end; $n++) {
     if (@($progress.completed) -contains $n) { continue }
     Show-Action "Step $n pre-check"
     if (-not (Test-JarvisStepPreCheck -Number $n -Paths $paths -DryRun:$DryRun)) { throw "Step $n pre-check failed." }
+    $isModelStep = $null -ne (Get-JarvisStepPrompt -Number $n -Root $root)
+    if ($isModelStep -and -not $DryRun) {
+        $servers = @(Get-Process -Name ollama -ErrorAction SilentlyContinue)
+        if ($servers.Count -eq 0) { throw "Ollama isn't running. Start the Ollama app once, then rerun." }
+        if ($servers.Count -gt 1) { throw "Two Ollama servers are running. Close the extra one (keep the Ollama app), then rerun. PIDs: $(@($servers | ForEach-Object Id) -join ', ')" }
+        try { $tags = @((Invoke-RestMethod -Uri 'http://127.0.0.1:11434/api/tags' -TimeoutSec 5).models | ForEach-Object name) }
+        catch { throw "Ollama /api/tags did not answer within 5 seconds: $($_.Exception.Message)" }
+        $ready = Test-JarvisOllamaReady -Processes $servers -Tags $tags
+        if (-not $ready.Ready) { throw $ready.Message }
+    }
     if ($n -gt 12) { throw "Step $n not implemented: Milestone 1 stops after step 12." }
     if ($n -eq 15) {
         if (-not (Test-JarvisPortFree -Port 8899)) { throw 'Port 8899 must be free before dashboard installation.' }
@@ -56,10 +67,10 @@ for ($n = $start; $n -le $end; $n++) {
     switch ($n) {
         1 { if (-not $DryRun) { foreach ($f in @('USER.md','MEMORY.md')) { Backup-JarvisFile (Join-Path $paths.HermesHome "memories\$f") (Join-Path $paths.StateRoot 'backups') -UndoPath $undoPath | Out-Null }; Write-JarvisMemoryEntry (Join-Path $paths.HermesHome 'memories\USER.md') "$($form.name) works as: $($form.work). Time zone: $($form.timezone). Hours: $($form.hours). Weather city: $($form.weather_city)."; Write-JarvisMemoryEntry (Join-Path $paths.HermesHome 'memories\MEMORY.md') "JARVIS is chief of staff. Top priority: $($form.priority)." } }
         2 { if (-not $DryRun) { Backup-JarvisFile (Join-Path $paths.HermesHome 'memories\USER.md') (Join-Path $paths.StateRoot 'backups') -UndoPath $undoPath | Out-Null; Write-JarvisMemoryEntry (Join-Path $paths.HermesHome 'memories\USER.md') "Interview answers: $($form.interview -join ' | ')`nOpen questions: none recorded by installer." } }
-        3 { if (-not $DryRun) { Backup-JarvisFile (Join-Path $paths.HermesHome 'memories\MEMORY.md') (Join-Path $paths.StateRoot 'backups') -UndoPath $undoPath | Out-Null; Write-JarvisMemoryEntry (Join-Path $paths.HermesHome 'memories\MEMORY.md') (Get-Content (Join-Path $root 'templates\memory-rules.md') -Raw) } }
-        4 { Invoke-JarvisStepAction -Number 4 -Paths $paths -Root $root -Form $form -DryRun:$DryRun }
+        3 { if (-not $DryRun) { Backup-JarvisFile (Join-Path $paths.HermesHome 'memories\MEMORY.md') (Join-Path $paths.StateRoot 'backups') -UndoPath $undoPath | Out-Null; Write-JarvisMemoryEntry (Join-Path $paths.HermesHome 'memories\MEMORY.md') (Read-JarvisUtf8Text (Join-Path $root 'templates\memory-rules.md')) } }
+        4 { Invoke-JarvisStepAction -Number 4 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
         5 { Install-JarvisCrew $paths.HermesHome (Join-Path $root 'templates') $form.name -DryRun:$DryRun }
-        6 { Invoke-JarvisStepAction -Number 6 -Paths $paths -Root $root -Form $form -DryRun:$DryRun }
+        6 { Invoke-JarvisStepAction -Number 6 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
         7 {
             if (-not $DryRun) {
                 $token = Get-JarvisEnvValue (Join-Path $paths.HermesHome '.env') 'TELEGRAM_BOT_TOKEN'
@@ -91,7 +102,7 @@ for ($n = $start; $n -le $end; $n++) {
                 & hermes gateway restart | Out-Null; if ($LASTEXITCODE -ne 0) { throw 'Hermes gateway restart failed.' }
             } else { Show-Action 'Install and enable telegram_topic_profiles; set multiplexing; restart gateway' }
         }
-        10 { Invoke-JarvisStepAction -Number 10 -Paths $paths -Root $root -Form $form -DryRun:$DryRun }
+        10 { Invoke-JarvisStepAction -Number 10 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
         11 { if (-not $DryRun) { New-Item -ItemType Directory -Force -Path $paths.ProjectRoot | Out-Null; Initialize-JarvisActivityLog $logPath } }
         12 {
             if (-not $DryRun) {
@@ -104,7 +115,7 @@ for ($n = $start; $n -le $end; $n++) {
             }
         }
         13 { if ($WithClaudeCode) { Invoke-JarvisStepAction -Number 13 -Paths $paths -Root $root -Form $form -DryRun:$DryRun } else { Show-Action 'Claude Code skipped by switch' } }
-        14 { Invoke-JarvisStepAction -Number 14 -Paths $paths -Root $root -Form $form -DryRun:$DryRun }
+        14 { Invoke-JarvisStepAction -Number 14 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
         15 { if (-not $DryRun) { Install-JarvisDashboardFiles $paths.ProjectRoot (Join-Path $root 'dashboard'); Register-JarvisDashboardTask $paths.ProjectRoot } }
         16 { Invoke-JarvisStepAction -Number 16 -Paths $paths -Root $root -Form $form -DryRun:$DryRun }
         17 { Invoke-JarvisStepAction -Number 17 -Paths $paths -Root $root -Form $form -DryRun:$DryRun }
@@ -117,12 +128,12 @@ for ($n = $start; $n -le $end; $n++) {
         36 { if ($WithComposio) { Invoke-JarvisStepAction -Number 36 -Paths $paths -Root $root -Form $form -DryRun:$DryRun } else { Show-Action 'Composio skipped by switch' } }
         38 { if (-not $DryRun) { Write-JarvisBriefingConfig (Join-Path $paths.ProjectRoot 'briefing.json') $form.weather_city }; Invoke-JarvisStepAction -Number 38 -Paths $paths -Root $root -Form $form -DryRun:$DryRun }
         41 { if ($WithTailscale -and -not $DryRun) { Install-JarvisAccess $paths.ProjectRoot -WithTailscale } }
-        43 { if (-not $DryRun) { Test-JarvisInstall $paths.ProjectRoot $paths.HermesHome | ConvertTo-Json | Set-Content (Join-Path $paths.StateRoot 'verification.json') }; Invoke-JarvisStepAction -Number 43 -Paths $paths -Root $root -Form $form -DryRun:$DryRun }
+        43 { if (-not $DryRun) { Test-JarvisInstall $paths.ProjectRoot $paths.HermesHome | ConvertTo-Json | Set-Content (Join-Path $paths.StateRoot 'verification.json') }; Invoke-JarvisStepAction -Number 43 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
         44 { if ($WithHomeAssistant) { Invoke-JarvisStepAction -Number 44 -Paths $paths -Root $root -Form $form -DryRun:$DryRun } else { Show-Action 'Home Assistant skipped by switch' } }
         default { throw "Step $n not implemented: this milestone is intentionally gated before dashboard, voice, comms, and finish work." }
     }
     $postPassed = Test-JarvisStepPostCheck -Number $n -Paths $paths -Root $root -DryRun:$DryRun
-    if (-not $postPassed) { throw "Step $n post-check failed; progress was not advanced." }
+    if (-not $postPassed) { throw (Get-JarvisPostCheckFailureMessage -Step $n -Output $(if (Test-Path (Join-Path $paths.StateRoot ("agent-turn-{0:D2}.txt" -f $n))) { Read-JarvisUtf8Text (Join-Path $paths.StateRoot ("agent-turn-{0:D2}.txt" -f $n)) } else { '' })) }
     Show-Action "Step $n post-check passed"
     if (-not $DryRun) { Save-JarvisProgress -Path $progressPath -Completed (@($progress.completed) + @($n)) -Current ($n + 1); $progress = Get-JarvisProgress $progressPath }
 }

@@ -7,13 +7,16 @@ function Get-JarvisStepPrompt {
 }
 
 function Invoke-JarvisStepAction {
-    param([int]$Number, [psobject]$Paths, [string]$Root, [psobject]$Form, [switch]$DryRun)
+    param([int]$Number, [psobject]$Paths, [string]$Root, [psobject]$Form, [switch]$DryRun, [int]$TimeoutMinutes = 25)
     $prompt = Get-JarvisStepPrompt -Number $Number -Root $Root
     if ($prompt) {
         if ($DryRun) { Write-Output "DRY-RUN: owner/agent self-check $Number using $([IO.Path]::GetFileName($prompt))"; return }
-        $response = Invoke-JarvisAgentTurn -PromptFile $prompt -Profile 'default' -WorkDirectory $Paths.ProjectRoot
+        Write-Host "Don't post in the Telegram group until this step finishes."
+        $response = Invoke-JarvisAgentTurn -PromptFile $prompt -Profile 'default' -WorkDirectory $Paths.ProjectRoot -StepNumber $Number -TimeoutMinutes $TimeoutMinutes
         New-Item -ItemType Directory -Force -Path $Paths.StateRoot | Out-Null
-        Set-Content -LiteralPath (Join-Path $Paths.StateRoot ("agent-turn-{0:D2}.txt" -f $Number)) -Value $response -Encoding UTF8
+        Write-JarvisUtf8Text -Path (Join-Path $Paths.StateRoot ("agent-turn-{0:D2}.txt" -f $Number)) -Text $response
+        $lastLine = @($response -split "`r?`n" | Where-Object { $_.Trim() })[-1]
+        if ($lastLine -match '\?\s*$') { throw "Agent ended step $Number with a question instead of doing the work. Answer it in $([IO.Path]::GetFullPath($prompt)), then rerun." }
     }
 }
 
@@ -23,16 +26,16 @@ function Test-JarvisStepPostCheck {
     $userMemory = Join-Path $Paths.HermesHome 'memories\USER.md'
     $memory = Join-Path $Paths.HermesHome 'memories\MEMORY.md'
     switch ($Number) {
-        1 { return (Test-Path $userMemory) -and (Test-Path $memory) -and ((Get-Content $userMemory -Raw).Trim().Length -gt 0) }
-        2 { return (Get-Content $userMemory -Raw) -match 'Interview answers:' -and (Get-Content $userMemory -Raw) -match 'Open questions:' }
+        1 { return (Test-Path $userMemory) -and (Test-Path $memory) -and ((Read-JarvisUtf8Text $userMemory).Trim().Length -gt 0) }
+        2 { return (Read-JarvisUtf8Text $userMemory) -match 'Interview answers:' -and (Read-JarvisUtf8Text $userMemory) -match 'Open questions:' }
         3 {
-            $text = Get-Content $memory -Raw
+            $text = Read-JarvisUtf8Text $memory
             foreach ($heading in @('PROGRESS','APPROVAL','COMMUNICATION','DELEGATION','BLOCKED COMMANDS','PERSONAL AUTHORITY')) { if ($text -notmatch [regex]::Escape($heading)) { return $false } }
             return $true
         }
-        4 { $turn = Join-Path $Paths.StateRoot 'agent-turn-04.txt'; $text = if (Test-Path $turn) { Get-Content $turn -Raw } else { '' }; return $text -match 'JARVIS' -and $text -match 'dev' -and $text -match 'research' -and $text -match 'assistant' }
+        4 { $turn = Join-Path $Paths.StateRoot 'agent-turn-04.txt'; $text = if (Test-Path $turn) { Read-JarvisUtf8Text $turn } else { '' }; return $text -match 'JARVIS' -and $text -match 'dev' -and $text -match 'research' -and $text -match 'assistant' }
         5 { return @('dev','research','assistant' | Where-Object { -not (Test-Path (Join-Path $Paths.HermesHome "profiles\$_\SOUL.md")) }).Count -eq 0 }
-        6 { $turn = Join-Path $Paths.StateRoot 'agent-turn-06.txt'; $text = if (Test-Path $turn) { Get-Content $turn -Raw } else { '' }; return $text -match 'JARVIS' -and $text -match 'DEV' -and $text -match 'RESEARCH' -and $text -match 'ASSISTANT' }
+        6 { $turn = Join-Path $Paths.StateRoot 'agent-turn-06.txt'; $text = if (Test-Path $turn) { Read-JarvisUtf8Text $turn } else { '' }; return $text -match 'JARVIS' -and $text -match 'DEV' -and $text -match 'RESEARCH' -and $text -match 'ASSISTANT' }
         7 {
             if (-not (Test-Path (Join-Path $Paths.StateRoot 'telegram.json'))) { return $false }
             $telegram = Get-Content (Join-Path $Paths.StateRoot 'telegram.json') -Raw | ConvertFrom-Json
@@ -48,7 +51,7 @@ function Test-JarvisStepPostCheck {
             return $true
         }
         9 { $config = Join-Path $Paths.HermesHome 'config.yaml'; return (Test-Path (Join-Path $Paths.HermesHome 'plugins\telegram_topic_profiles\plugin.yaml')) -and (Test-Path (Join-Path $Paths.HermesHome 'plugins\telegram_topic_profiles\topics.json')) -and (Test-Path $config) -and ((Get-Content $config -Raw) -match 'multiplex_profiles') }
-        10 { $turn = Join-Path $Paths.StateRoot 'agent-turn-10.txt'; $text = if (Test-Path $turn) { Get-Content $turn -Raw } else { '' }; return $text -match 'DEV' -and $text -match 'RESEARCH' -and $text -match 'ASSISTANT' -and $text -match 'works|failed' }
+        10 { $turn = Join-Path $Paths.StateRoot 'agent-turn-10.txt'; $text = if (Test-Path $turn) { Read-JarvisUtf8Text $turn } else { '' }; return $text -match 'DEV' -and $text -match 'RESEARCH' -and $text -match 'ASSISTANT' -and $text -match 'works|failed' }
         11 { $db = Join-Path $Paths.ProjectRoot 'agent-logs.db'; return (Test-Path $db) -and ((Get-Item $db).Length -gt 0) }
         12 {
             $rows = @(Get-JarvisActivity -DatabasePath (Join-Path $Paths.ProjectRoot 'agent-logs.db'))

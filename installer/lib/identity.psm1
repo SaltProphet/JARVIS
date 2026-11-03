@@ -46,13 +46,15 @@ function Complete-JarvisOwnerForm {
     if ([string]::IsNullOrWhiteSpace($result.telegram_chat_id)) {
         $token = Get-JarvisEnvValue -EnvFile $EnvFile -Name 'TELEGRAM_BOT_TOKEN'
         if ($token) {
-            Write-Host 'Send any message in the Telegram group, then press Enter to detect it.'
-            Read-Host 'Press Enter after sending the group message' | Out-Null
-            $candidate = Get-JarvisTelegramGroupFromUpdates -Token $token
-            if ($candidate) {
-                Write-Host "Detected Telegram group: $($candidate.title) [$($candidate.id)]"
-                if ((Read-Host 'Use this group? (Y/N)') -match '^[Yy]') { $result.telegram_chat_id = $candidate.id }
+            $candidate = Read-Host 'Telegram group chat ID [default -1003967974233; type detect to detect]'
+            if ([string]::IsNullOrWhiteSpace($candidate)) { $candidate = '-1003967974233' }
+            if ($candidate -eq 'detect') {
+                Write-Host 'Send any message in the Telegram group, then press Enter to detect it.'
+                Read-Host 'Press Enter after sending the group message' | Out-Null
+                $found = Get-JarvisTelegramGroupFromUpdates -Token $token
+                if ($found) { $candidate = $found.id; Write-Host "Detected Telegram group: $($found.title) [$($found.id)]" }
             }
+            if ($candidate) { $result.telegram_chat_id = Normalize-JarvisTelegramChatId -Token $token -ChatId $candidate }
         }
         if ([string]::IsNullOrWhiteSpace($result.telegram_chat_id)) { $result.telegram_chat_id = Read-Host 'Telegram group chat ID' }
     }
@@ -87,18 +89,32 @@ function Get-JarvisMissingOwnerFields {
 function Write-JarvisMemoryEntry {
     param([string]$MemoryFile, [string]$Entry)
     New-Item -ItemType Directory -Force -Path (Split-Path $MemoryFile -Parent) | Out-Null
-    $raw = if (Test-Path $MemoryFile) { Get-Content $MemoryFile -Raw } else { $null }
+    $raw = if (Test-Path $MemoryFile) { Read-JarvisUtf8Text $MemoryFile } else { $null }
     $existing = if ($null -eq $raw) { '' } else { $raw.Trim() }
     if ($existing -notlike "*$Entry*") { Set-Content -LiteralPath $MemoryFile -Value (($existing, $Entry -join "`n§`n").Trim()) -Encoding UTF8 }
 }
 
 function Invoke-JarvisAgentTurn {
-    param([string]$PromptFile, [string]$Profile = 'default', [string]$Hermes = 'hermes', [string]$WorkDirectory)
-    $prompt = Get-Content -LiteralPath $PromptFile -Raw
+    param([string]$PromptFile, [string]$Profile = 'default', [string]$Hermes = 'hermes', [string]$WorkDirectory, [int]$StepNumber = 0, [int]$TimeoutMinutes = 25, [string]$LogPath = $(Join-Path $env:LOCALAPPDATA 'hermes\logs\agent.log'))
+    $prompt = Read-JarvisUtf8Text -Path $PromptFile
+    $prompt = "This is an isolated installer turn for step $StepNumber. Do only the one job in this prompt. Do not answer a different question and do not use a resumed conversation.`n`n$prompt"
     $args = @(); if ($Profile -ne 'default') { $args += @('-p', $Profile) }; $args += @('-z', $prompt)
-    $result = & $Hermes @args 2>&1
-    if ($LASTEXITCODE -ne 0) { throw "Hermes turn failed for ${Profile}: $($result -join ' ')" }
-    $result -join [Environment]::NewLine
+    $outFile = [IO.Path]::GetTempFileName(); $errFile = [IO.Path]::GetTempFileName(); $started = Get-Date
+    try {
+        $process = Start-Process -FilePath $Hermes -ArgumentList $args -WorkingDirectory $WorkDirectory -RedirectStandardOutput $outFile -RedirectStandardError $errFile -PassThru
+        $lastLogLength = 0; $nextHeartbeat = $started.AddSeconds(30)
+        while (-not $process.HasExited) {
+            Start-Sleep -Seconds 1
+            $elapsed = (Get-Date) - $started
+            if ((Get-Date) -ge $nextHeartbeat) { Write-Host (Format-JarvisModelHeartbeat -Step $StepNumber -Elapsed $elapsed); $nextHeartbeat = $nextHeartbeat.AddSeconds(30) }
+            if (Test-Path $LogPath) { $log = Read-JarvisUtf8Text $LogPath; if ($log.Length -gt $lastLogLength) { $new = $log.Substring($lastLogLength); $lastLogLength = $log.Length; $new -split "`r?`n" | Where-Object { $_ -match 'APIConnectionError|Connection error|API call failed' } | ForEach-Object { Write-Host $_ } } }
+            try { Invoke-RestMethod -Uri 'http://127.0.0.1:11434/api/tags' -TimeoutSec 5 | Out-Null } catch { throw "Ollama stopped responding during step $StepNumber. Start it and rerun; the installer resumes at step $StepNumber." }
+            if ($elapsed.TotalMinutes -ge $TimeoutMinutes) { $process.Kill(); throw (Get-JarvisModelTimeoutMessage -Step $StepNumber -Minutes $TimeoutMinutes) }
+        }
+        $result = @((Get-Content -LiteralPath $outFile -Encoding UTF8), (Get-Content -LiteralPath $errFile -Encoding UTF8))
+        if ($process.ExitCode -ne 0) { throw "Hermes turn failed for ${Profile}: $($result -join ' ')" }
+        $result -join [Environment]::NewLine
+    } finally { Remove-Item $outFile,$errFile -Force -ErrorAction SilentlyContinue }
 }
 
 Export-ModuleMember -Function *-Jarvis*

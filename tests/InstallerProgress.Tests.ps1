@@ -3,6 +3,8 @@ Describe 'Installer progress with a fake Hermes home' {
         $fakeHermes = Join-Path $TestDrive 'through-hermes'
         $fakeState = Join-Path $TestDrive 'through-state'
         New-Item -ItemType Directory -Force -Path $fakeHermes,$fakeState | Out-Null
+        $oldHermes = $env:HERMES_HOME
+        $oldState = $env:JARVIS_STATE_ROOT
         $env:HERMES_HOME = $fakeHermes
         $env:JARVIS_STATE_ROOT = $fakeState
         try {
@@ -11,8 +13,8 @@ Describe 'Installer progress with a fake Hermes home' {
             $output | Should Match 'through step 12'
             $output | Should Not Match 'Step 13 pre-check'
         } finally {
-            Remove-Item Env:HERMES_HOME -ErrorAction SilentlyContinue
-            Remove-Item Env:JARVIS_STATE_ROOT -ErrorAction SilentlyContinue
+            if ($null -eq $oldHermes) { Remove-Item Env:HERMES_HOME -ErrorAction SilentlyContinue } else { $env:HERMES_HOME = $oldHermes }
+            if ($null -eq $oldState) { Remove-Item Env:JARVIS_STATE_ROOT -ErrorAction SilentlyContinue } else { $env:JARVIS_STATE_ROOT = $oldState }
         }
     }
 

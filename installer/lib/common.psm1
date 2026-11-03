@@ -40,6 +40,40 @@ function Test-JarvisRequiredProcesses {
     $true
 }
 
+function Write-JarvisUtf8Text {
+    param([string]$Path, [AllowEmptyString()][string]$Text)
+    [IO.File]::WriteAllText($Path, $Text, (New-Object Text.UTF8Encoding($false)))
+}
+
+function Read-JarvisUtf8Text {
+    param([string]$Path)
+    [IO.File]::ReadAllText($Path, (New-Object Text.UTF8Encoding($false)))
+}
+
+function Test-JarvisOllamaReady {
+    param([object[]]$Processes, [string[]]$Tags)
+    if (@($Processes).Count -eq 0) { return [pscustomobject]@{ Ready = $false; Message = "Ollama isn't running. Start the Ollama app once, then rerun." } }
+    if (@($Processes).Count -gt 1) { return [pscustomobject]@{ Ready = $false; Message = "Two Ollama servers are running. Close the extra one (keep the Ollama app), then rerun. PIDs: $(@($Processes | ForEach-Object Id) -join ', ')" } }
+    if (@($Tags) -notcontains 'gpt-oss:20b') { return [pscustomobject]@{ Ready = $false; Message = 'Ollama is answering, but gpt-oss:20b is not listed by /api/tags.' } }
+    [pscustomobject]@{ Ready = $true; Message = '' }
+}
+
+function Get-JarvisModelTimeoutMessage {
+    param([int]$Step, [int]$Minutes)
+    "Step $Step exceeded the $Minutes minute model time limit; its Hermes process was ended. Progress was not advanced. Rerun to resume at step $Step."
+}
+
+function Format-JarvisModelHeartbeat {
+    param([int]$Step, [timespan]$Elapsed)
+    "Step $Step, elapsed $($Elapsed.ToString('hh\:mm\:ss')), waiting on model"
+}
+
+function Get-JarvisPostCheckFailureMessage {
+    param([int]$Step, [AllowEmptyString()][string]$Output)
+    $sample = if ($Output.Length -gt 500) { $Output.Substring(0, 500) } else { $Output }
+    "Step $Step post-check failed; first 500 characters of agent output: $sample"
+}
+
 function Save-JarvisProgress {
     param([string]$Path, [int[]]$Completed = @(), [int]$Current = 1)
     $parent = Split-Path $Path -Parent

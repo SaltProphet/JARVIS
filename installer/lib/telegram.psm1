@@ -16,6 +16,16 @@ function Invoke-JarvisTelegramApi {
     $response.result
 }
 
+function Normalize-JarvisTelegramChatId {
+    param([string]$Token, [string]$ChatId)
+    $normalized = $ChatId.Trim()
+    if ($normalized -match '^\d+$' -and $normalized.Length -ge 10) { $normalized = "-$normalized" }
+    if ($normalized -notmatch '^-?\d+$') { throw "Telegram chat ID is invalid: $ChatId" }
+    $chat = Invoke-JarvisTelegramApi $Token 'getChat' @{ chat_id = $normalized }
+    if ($chat.type -notin @('group','supergroup')) { throw "Telegram chat $normalized is not a group or supergroup." }
+    $normalized
+}
+
 function Find-JarvisTelegramGroup {
     param([object[]]$Updates)
     foreach ($update in @($Updates | Sort-Object update_id -Descending)) {
