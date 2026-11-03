@@ -2,19 +2,27 @@ Set-StrictMode -Version Latest
 
 function Get-JarvisStepPrompt {
     param([int]$Number, [string]$Root)
-    $names = @{ 4='04-plan-crew.txt'; 6='06-team-awareness.txt'; 10='10-first-words.txt'; 13='13-builder-orientation.txt'; 14='14-data-survey.txt'; 43='43-final-verification.txt' }
+    $names = @{ 4='04-plan-crew.txt'; 6='06-team-awareness.txt'; 10='10-first-words.txt'; 43='43-final-verification.txt' }
     if ($names.ContainsKey($Number)) { Join-Path $Root ("prompts\$($names[$Number])") } else { $null }
+}
+
+function Get-JarvisStepProfile {
+    param([int]$Number)
+    if ($Number -eq 14) { return 'dev' }
+    if ($Number -in @(4,6,10,43)) { return 'default' }
+    $null
 }
 
 function Invoke-JarvisStepAction {
     param([int]$Number, [psobject]$Paths, [string]$Root, [psobject]$Form, [switch]$DryRun, [int]$TimeoutMinutes = 25, [switch]$Retry)
     $prompt = Get-JarvisStepPrompt -Number $Number -Root $Root
     if ($prompt) {
-        if ($DryRun -and -not $env:JARVIS_DRYRUN_HERMES) { Write-Output "DRY-RUN: owner/agent self-check $Number using $([IO.Path]::GetFileName($prompt))"; return }
+        if ($DryRun) { Write-Output "DRY-RUN: owner/agent self-check $Number using $([IO.Path]::GetFileName($prompt))"; return }
         Write-Host "Don't post in the Telegram group until this step finishes."
         $hermes = if ($env:JARVIS_DRYRUN_HERMES) { $env:JARVIS_DRYRUN_HERMES } else { 'hermes' }
         $logPath = if ($DryRun) { Join-Path $Paths.StateRoot 'dryrun-agent.log' } else { Join-Path $env:LOCALAPPDATA 'hermes\logs\agent.log' }
-        $response = Invoke-JarvisAgentTurn -PromptFile $prompt -Profile 'default' -Hermes $hermes -WorkDirectory $Paths.HermesHome -StepNumber $Number -TimeoutMinutes $TimeoutMinutes -LogPath $logPath -SkipOllamaCheck:$DryRun -Retry:$Retry
+        $profile = Get-JarvisStepProfile -Number $Number
+        $response = Invoke-JarvisAgentTurn -PromptFile $prompt -Profile $profile -Hermes $hermes -WorkDirectory $Paths.HermesHome -StepNumber $Number -TimeoutMinutes $TimeoutMinutes -LogPath $logPath -SkipOllamaCheck:$DryRun -Retry:$Retry
         if ($DryRun) { Write-Output "DRY-RUN: stub Hermes turn completed for step $Number"; return }
         New-Item -ItemType Directory -Force -Path $Paths.StateRoot | Out-Null
         Write-JarvisUtf8Text -Path (Join-Path $Paths.StateRoot ("agent-prompt-{0:D2}.txt" -f [int]$Number)) -Text (Get-JarvisInstallerPrompt -PromptFile $prompt -StepNumber $Number -Retry:$Retry)
@@ -71,6 +79,16 @@ function Test-JarvisStepPostCheck {
                 if (-not (Test-Path $memoryFile) -or (Read-JarvisUtf8Text $memoryFile) -notmatch 'log-task') { return $false }
             }
             return $true
+        }
+        13 {
+            $rows = @(Get-JarvisActivity -DatabasePath (Join-Path $Paths.ProjectRoot 'agent-logs.db'))
+            if ($rows.Count -eq 0) { return $false }
+            return ($rows[-1].task_description -match '^Builder orientation: (skipped|provider-neutral)')
+        }
+        14 {
+            $rows = @(Get-JarvisActivity -DatabasePath (Join-Path $Paths.ProjectRoot 'agent-logs.db'))
+            if ($rows.Count -eq 0) { return $false }
+            return ($rows[-1].agent_name -eq 'DEV' -and $rows[-1].task_description -match '^Read-only data survey:' -and $rows[-1].task_description -match 'limitations=')
         }
         default { return $false }
     }

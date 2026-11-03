@@ -15,7 +15,7 @@ if action == "add":
     status = sys.argv[5]
     if status not in ("completed", "failed", "running"):
         raise SystemExit("invalid status")
-    model = sys.argv[6] or None
+    model = sys.argv[6] if len(sys.argv) > 6 and sys.argv[6] else None
     con.execute("INSERT INTO agent_logs(agent_name,task_description,model_used,status,created_at) VALUES(?,?,?,?,datetime('now'))", (agent, description, model, status))
     con.commit()
 elif action == "get":

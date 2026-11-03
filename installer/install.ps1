@@ -59,7 +59,7 @@ for ($n = $start; $n -le $end; $n++) {
         $ready = Test-JarvisOllamaReady -Processes $servers -Tags $tags
         if (-not $ready.Ready) { throw $ready.Message }
     }
-    if ($n -gt 12) { throw "Step $n not implemented: Milestone 1 stops after step 12." }
+    if ($n -gt 14) { throw "Step $n not implemented: the current milestone stops after step 14." }
     if ($n -eq 15) {
         if (-not (Test-JarvisPortFree -Port 8899)) { throw 'Port 8899 must be free before dashboard installation.' }
         if (-not $DryRun -and -not (Test-JarvisRequiredProcesses)) { throw 'Paperclip, Postgres, and Ollama must remain running during installation.' }
@@ -117,8 +117,24 @@ for ($n = $start; $n -le $end; $n++) {
                 foreach ($agent in @('JARVIS','DEV','RESEARCH','ASSISTANT')) { Add-JarvisActivity $logPath $agent 'installer smoke test' 'completed' 'gpt-oss:20b' }
             }
         }
-        13 { if ($WithBuilderOrientation) { Invoke-JarvisStepAction -Number 13 -Paths $paths -Root $root -Form $form -DryRun:$DryRun } else { Show-Action 'Builder orientation skipped by switch' } }
-        14 { Invoke-JarvisStepAction -Number 14 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
+        13 {
+            if ($DryRun) { Show-Action $(if ($WithBuilderOrientation) { 'Record provider-neutral external builder orientation' } else { 'Record durable builder orientation skip' }) }
+            elseif ($WithBuilderOrientation) {
+                Add-JarvisActivity $logPath 'JARVIS' 'Builder orientation: provider-neutral external builder; layout=Hermes home/profiles; crew=JARVIS routes, DEV builds, RESEARCH verifies, ASSISTANT supports; routing=native profile_routes; project=jarvis-mission-control; role=builder-only; Hermes crew keeps running when the builder closes.' 'completed'
+            } else {
+                Add-JarvisActivity $logPath 'JARVIS' 'Builder orientation: skipped (WithBuilderOrientation not selected); native profile_routes and the Hermes crew remain independent of every coding application.' 'completed'
+            }
+        }
+        14 {
+            if ($DryRun) { Show-Action 'Survey Hermes and JARVIS data sources read-only; record sanitized DEV-attributed facts' }
+            else {
+                $survey = Get-JarvisDataSurvey -Paths $paths
+                $available = @($survey.sources | Where-Object available).Count
+                $timestamps = @($survey.sources | ForEach-Object { @($_.timestamp_types) } | Sort-Object -Unique) -join ','
+                $names = @($survey.sources | ForEach-Object name) -join ','
+                Add-JarvisActivity $logPath 'DEV' "Read-only data survey: available=$available/$(@($survey.sources).Count); limitations=$($survey.limitations -join ' '); timestamp-types=$timestamps; sources=$names" 'completed'
+            }
+        }
         15 { if (-not $DryRun) { Install-JarvisDashboardFiles $paths.ProjectRoot (Join-Path $root 'dashboard'); Register-JarvisDashboardTask $paths.ProjectRoot } }
         16 { Invoke-JarvisStepAction -Number 16 -Paths $paths -Root $root -Form $form -DryRun:$DryRun }
         17 { Invoke-JarvisStepAction -Number 17 -Paths $paths -Root $root -Form $form -DryRun:$DryRun }

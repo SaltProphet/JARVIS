@@ -2,16 +2,33 @@ $steps = Join-Path $PSScriptRoot '..\installer\lib\steps.psm1'
 $common = Join-Path $PSScriptRoot '..\installer\lib\common.psm1'
 $identity = Join-Path $PSScriptRoot '..\installer\lib\identity.psm1'
 $telegram = Join-Path $PSScriptRoot '..\installer\lib\telegram.psm1'
+$logging = Join-Path $PSScriptRoot '..\installer\lib\logging.psm1'
 Import-Module $steps -Force
 Import-Module $common -Force
 Import-Module $identity -Force
 Import-Module $telegram -Force
+Import-Module $logging -Force
 
 Describe 'JARVIS model safeguards' {
-    It 'registers the provider-neutral builder orientation prompt' {
-        $prompt = Get-JarvisStepPrompt -Number 13 -Root (Join-Path $PSScriptRoot '..\installer')
-        [IO.Path]::GetFileName($prompt) | Should Be '13-builder-orientation.txt'
-        Test-Path -LiteralPath $prompt | Should Be $true
+    It 'keeps external orientation out of Hermes and routes optional survey interpretation to DEV' {
+        Get-JarvisStepPrompt -Number 13 -Root (Join-Path $PSScriptRoot '..\installer') | Should Be $null
+        Get-JarvisStepProfile -Number 13 | Should Be $null
+        Get-JarvisStepProfile -Number 14 | Should Be 'dev'
+    }
+
+    It 'does not accept stale orientation or survey activity as the current post-check' {
+        $project = Join-Path $TestDrive 'post-check-project'
+        $paths = [pscustomobject]@{ ProjectRoot=$project; HermesHome=(Join-Path $TestDrive 'hermes'); StateRoot=(Join-Path $TestDrive 'state') }
+        $db = Join-Path $project 'agent-logs.db'
+        Add-JarvisActivity $db 'JARVIS' 'Builder orientation: skipped by test' 'completed'
+        Add-JarvisActivity $db 'DEV' 'unrelated later activity' 'completed'
+        $rows = @(Get-JarvisActivity $db)
+        $rows.Count | Should Be 2
+        $rows[-1].task_description | Should Be 'unrelated later activity'
+        Test-JarvisStepPostCheck -Number 13 -Paths $paths -Root $TestDrive | Should Be $false
+        Add-JarvisActivity $db 'DEV' 'Read-only data survey: limitations=test' 'completed'
+        Add-JarvisActivity $db 'JARVIS' 'unrelated later activity' 'completed'
+        Test-JarvisStepPostCheck -Number 14 -Paths $paths -Root $TestDrive | Should Be $false
     }
 
     It 'rejects no Ollama server' {

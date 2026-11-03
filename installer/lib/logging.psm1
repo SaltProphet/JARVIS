@@ -17,7 +17,7 @@ function Initialize-JarvisActivityLog {
 function Add-JarvisActivity {
     param([string]$DatabasePath, [string]$Agent, [string]$Description, [ValidateSet('completed','failed','running')][string]$Status, [string]$Model = '')
     Initialize-JarvisActivityLog $DatabasePath
-    Invoke-JarvisSqlite @($DatabasePath, 'add', $Agent, '', $Description, $Status, $Model) | Out-Null
+    Invoke-JarvisSqlite @($DatabasePath, 'add', $Agent, $Description, $Status, $Model) | Out-Null
 }
 
 function Get-JarvisActivity {
@@ -25,7 +25,8 @@ function Get-JarvisActivity {
     Initialize-JarvisActivityLog $DatabasePath
     $raw = Invoke-JarvisSqlite @($DatabasePath, 'get')
     if (-not $raw) { return @() }
-    @($raw -join '' | ConvertFrom-Json)
+    $rows = $raw -join '' | ConvertFrom-Json
+    foreach ($row in @($rows)) { Write-Output $row }
 }
 
 Export-ModuleMember -Function *-Jarvis*
