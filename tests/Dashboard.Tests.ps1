@@ -97,4 +97,12 @@ Describe 'Dashboard contract helpers' {
         $text | Should Match '390'
         $text | Should Match '1920'
     }
+
+    It 'keeps access loopback-only and disables Funnel' {
+        Import-Module (Join-Path $PSScriptRoot '..\installer\lib\access.psm1') -Force
+        $path = Join-Path $TestDrive 'access'; New-Item -ItemType Directory -Force -Path $path | Out-Null
+        Install-JarvisAccess $path -WithTailscale
+        $text = Get-Content (Join-Path $path 'access.json') -Raw
+        $text | Should Match '127.0.0.1:8899'; $text | Should Match 'funnel.*false'; $text | Should Match 'pending-owner'
+    }
 }

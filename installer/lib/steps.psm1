@@ -203,6 +203,19 @@ function Test-JarvisStepPostCheck {
             $text = [IO.File]::ReadAllText($audit)
             return $text -match '390' -and $text -match '768' -and $text -match '1280' -and $text -match '1440' -and $text -match '1920' -and $text -match 'source-only'
         }
+        41 {
+            $access = Join-Path $Paths.ProjectRoot 'access.json'
+            if (-not (Test-Path -LiteralPath $access -PathType Leaf)) { return $false }
+            $text = [IO.File]::ReadAllText($access)
+            return $text -match '127.0.0.1:8899' -and $text -match '127.0.0.1:8767' -and $text -match 'funnel.*false'
+        }
+        42 { return (Test-Path -LiteralPath (Join-Path $Paths.ProjectRoot 'docs.md') -PathType Leaf) -and ([IO.File]::ReadAllText((Join-Path $Paths.ProjectRoot 'docs.md')) -match '127.0.0.1:8899') }
+        43 {
+            $verification = Join-Path $Paths.StateRoot 'verification.json'
+            if (-not (Test-Path -LiteralPath $verification -PathType Leaf)) { return $false }
+            $text = [IO.File]::ReadAllText($verification)
+            return $text -match '"ok"\s*:\s*true'
+        }
         default { return $false }
     }
 }

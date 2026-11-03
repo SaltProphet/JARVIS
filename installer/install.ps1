@@ -177,9 +177,9 @@ for ($n = $start; $n -le $end; $n++) {
         38 { if (-not $DryRun) { Write-JarvisBriefingConfig (Join-Path $paths.ProjectRoot 'briefing.json') $form.weather_city }; Show-Action 'Use owner-city briefing config with four triggers and a three-sentence spoken format' }
         39 { if (-not $DryRun) { Install-JarvisPoller $paths.ProjectRoot $root }; Show-Action 'Install throttled private-services poller and stale cache chips' }
         40 { if (-not $DryRun) { Write-JarvisResponsiveAudit (Join-Path $paths.ProjectRoot 'responsive-audit.json') (Join-Path $root 'dashboard') }; Show-Action 'Record responsive evidence for 390, 768, 1280, 1440, and 1920 widths' }
-        41 { if ($WithTailscale) { Show-Action 'Install Tailscale, await owner authorization, and configure HTTPS serve' } else { Show-Action 'Tailscale skipped by switch' } }
-        42 { Invoke-JarvisStepAction -Number 42 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
-        43 { if (-not $DryRun) { Test-JarvisInstall $paths.ProjectRoot $paths.HermesHome | ConvertTo-Json | Set-Content (Join-Path $paths.StateRoot 'verification.json') }; Invoke-JarvisStepAction -Number 43 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
+        41 { if (-not $DryRun) { Install-JarvisAccess $paths.ProjectRoot -WithTailscale:$WithTailscale }; Show-Action 'Record loopback access; Tailscale HTTPS authorization remains pending-owner and Funnel is disabled' }
+        42 { if (-not $DryRun) { Copy-Item -LiteralPath (Join-Path $root 'dashboard\docs.md') -Destination (Join-Path $paths.ProjectRoot 'docs.md') -Force }; Show-Action 'Install and verify the operate-first local dashboard manual' }
+        43 { if (-not $DryRun) { Test-JarvisInstall $paths.ProjectRoot $paths.HermesHome | ConvertTo-Json | Set-Content (Join-Path $paths.StateRoot 'verification.json') }; Show-Action 'Write final evidence from installed files and mark owner-only checks pending' }
         44 { if ($WithHomeAssistant) { Invoke-JarvisStepAction -Number 44 -Paths $paths -Root $root -Form $form -DryRun:$DryRun } else { Show-Action 'Home Assistant skipped by switch' } }
         default { throw "Step $n not implemented: this milestone is intentionally gated before dashboard, voice, comms, and finish work." }
     }
