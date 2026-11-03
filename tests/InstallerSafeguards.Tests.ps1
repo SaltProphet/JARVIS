@@ -144,3 +144,10 @@ Describe 'JARVIS gateway command safeguards' {
         (Wait-JarvisGatewayRestart -Hermes $hermes -WorkingDirectory $root -PreviousPid 1234 -TimeoutSeconds 2) | Should Be 4321
     }
 }
+
+Describe 'JARVIS numeric step formatting' {
+    It 'formats a string step number with the numeric D2 format' {
+        $step = '10'
+        ('agent-turn-{0:D2}.txt' -f [int]$step) | Should Be 'agent-turn-10.txt'
+    }
+}

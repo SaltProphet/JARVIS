@@ -17,7 +17,7 @@ function Invoke-JarvisStepAction {
         $response = Invoke-JarvisAgentTurn -PromptFile $prompt -Profile 'default' -Hermes $hermes -WorkDirectory $Paths.HermesHome -StepNumber $Number -TimeoutMinutes $TimeoutMinutes -LogPath $logPath -SkipOllamaCheck:$DryRun
         if ($DryRun) { Write-Output "DRY-RUN: stub Hermes turn completed for step $Number"; return }
         New-Item -ItemType Directory -Force -Path $Paths.StateRoot | Out-Null
-        Write-JarvisUtf8Text -Path (Join-Path $Paths.StateRoot ("agent-turn-{0:D2}.txt" -f $Number)) -Text $response
+        Write-JarvisUtf8Text -Path (Join-Path $Paths.StateRoot ("agent-turn-{0:D2}.txt" -f [int]$Number)) -Text $response
         $lastLine = @($response -split "`r?`n" | Where-Object { $_.Trim() })[-1]
         if ($lastLine -match '\?\s*$') { throw "Agent ended step $Number with a question instead of doing the work. Answer it in $([IO.Path]::GetFullPath($prompt)), then rerun." }
     }
