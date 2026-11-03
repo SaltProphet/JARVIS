@@ -147,6 +147,7 @@ Describe 'JARVIS Hermes process invocation' {
         $response | Should Match '--safe-mode'
         $response | Should Match '--ignore-user-config'
         $response | Should Match '--ignore-rules'
+        $response | Should Match '--model\|gpt-oss:20b'
         $response | Should Match '--reasoning\|none'
         $response | Should Match '-t\|clarify'
     }

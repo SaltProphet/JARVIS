@@ -118,7 +118,7 @@ function Invoke-JarvisAgentTurn {
     if ([string]::IsNullOrWhiteSpace($WorkDirectory)) { $WorkDirectory = if ($env:HERMES_HOME) { $env:HERMES_HOME } else { Join-Path $env:LOCALAPPDATA 'hermes' } }
     if (-not (Test-Path -LiteralPath $WorkDirectory -PathType Container)) { throw "Hermes work directory does not exist: $WorkDirectory" }
     $prompt = Get-JarvisInstallerPrompt -PromptFile $PromptFile -StepNumber $StepNumber -Retry:$Retry
-    $processArguments = @('--safe-mode', '--ignore-user-config', '--ignore-rules', '--reasoning', 'none', '-t', (Get-JarvisInstallerToolset -StepNumber $StepNumber))
+    $processArguments = @('--safe-mode', '--ignore-user-config', '--ignore-rules', '--model', 'gpt-oss:20b', '--reasoning', 'none', '-t', (Get-JarvisInstallerToolset -StepNumber $StepNumber))
     if ($Profile -ne 'default') { $processArguments += @('-p', $Profile) }
     $processArguments += @('-z', ('"' + ([regex]::Replace($prompt, '(\\*)"', '$1$1\"') -replace '(\\+)$', '$1$1') + '"'))
     $outFile = [IO.Path]::GetTempFileName(); $errFile = [IO.Path]::GetTempFileName(); $started = Get-Date
