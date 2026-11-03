@@ -67,7 +67,7 @@ def _route(**kwargs):
     mapping = _load_map()
     if str(source.get("chat_id")) != str(mapping.get("chat_id")): return
     profile = mapping.get("topics", {}).get(str(source.get("thread_id")))
-    if profile: source["profile"] = profile
+    if profile: source.profile = profile
 def register(ctx):
     ctx.register_hook("pre_gateway_dispatch", _route)
 '@
