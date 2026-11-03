@@ -127,9 +127,11 @@ function Invoke-JarvisAgentTurn {
     $turnWorkspace = Join-Path ([IO.Path]::GetTempPath()) ("jarvis-installer-step-{0}-{1}" -f $StepNumber, [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Force -Path $turnWorkspace | Out-Null
     $quotedWorkspace = '"' + ([regex]::Replace($turnWorkspace, '(\\*)"', '$1$1\"') -replace '(\\+)$', '$1$1') + '"'
-    $quotedPrompt = '"' + ([regex]::Replace($prompt, '(\\*)"', '$1$1\"') -replace '(\\+)$', '$1$1') + '"'
-    $processArguments = @('chat', '-q', $quotedPrompt, '--oneshot', '--safe-mode', '--ignore-user-config', '--ignore-rules', '--model', 'gpt-oss:20b', '--provider', 'custom', '--base-url', 'http://127.0.0.1:11434/v1', '--reasoning', 'none', '-t', (Get-JarvisInstallerToolset -StepNumber $StepNumber), '--in', $quotedWorkspace)
-    if ($Profile -ne 'default') { $processArguments += @('-p', $Profile) }
+    $promptPath = [IO.Path]::GetTempFileName()
+    Write-JarvisUtf8Text -Path $promptPath -Text $prompt
+    $quotedPromptPath = '"' + ([regex]::Replace($promptPath, '(\\*)"', '$1$1\"') -replace '(\\+)$', '$1$1') + '"'
+    $processArguments = @('chat', '--query-file', $quotedPromptPath, '--oneshot', '--safe-mode', '--ignore-user-config', '--ignore-rules', '--model', 'gpt-oss:20b', '--provider', 'custom', '--base-url', 'http://127.0.0.1:11434/v1', '--reasoning', 'none', '-t', (Get-JarvisInstallerToolset -StepNumber $StepNumber), '--in', $quotedWorkspace)
+    if (-not [string]::IsNullOrWhiteSpace($Profile) -and $Profile -ne 'default') { $processArguments += @('-p', $Profile) }
     $outFile = [IO.Path]::GetTempFileName(); $errFile = [IO.Path]::GetTempFileName(); $started = Get-Date
     try {
         $process = Start-Process -FilePath $Hermes -ArgumentList ($processArguments -join ' ') -WorkingDirectory $WorkDirectory -RedirectStandardOutput $outFile -RedirectStandardError $errFile -PassThru
@@ -150,7 +152,7 @@ function Invoke-JarvisAgentTurn {
         if ($exitCode -ne 0) { throw "Hermes turn failed for ${Profile} (exit $exitCode): $($result -join ' ')" }
         $result -join [Environment]::NewLine
     } finally {
-        Remove-Item $outFile,$errFile -Force -ErrorAction SilentlyContinue
+        Remove-Item $outFile,$errFile,$promptPath -Force -ErrorAction SilentlyContinue
         Remove-Item $turnWorkspace -Recurse -Force -ErrorAction SilentlyContinue
     }
 }

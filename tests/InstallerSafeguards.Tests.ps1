@@ -166,7 +166,7 @@ Describe 'JARVIS Hermes process invocation' {
         $hermes = Join-Path $root 'fake-hermes.exe'
         $quote = [char]34
         Write-JarvisUtf8Text -Path $promptFile -Text "First line with a $quote quote $quote`r`nSecond line with $quote quotes $quote"
-        Add-Type -TypeDefinition 'using System; public static class FakeHermes { public static int Main(string[] args) { Console.WriteLine(String.Join("|", args)); Console.WriteLine("stub response"); return 0; } }' -OutputAssembly $hermes -OutputType ConsoleApplication
+        Add-Type -TypeDefinition 'using System; public static class FakeHermes { public static int Main(string[] args) { Console.WriteLine(String.Join("|", args)); for (var i = 0; i < args.Length - 1; i++) { if (args[i] == "--query-file") Console.WriteLine(System.IO.File.ReadAllText(args[i + 1])); } Console.WriteLine("stub response"); return 0; } }' -OutputAssembly $hermes -OutputType ConsoleApplication
         $oldHome = $env:HERMES_HOME
         try {
             $env:HERMES_HOME = $root
@@ -174,6 +174,7 @@ Describe 'JARVIS Hermes process invocation' {
         } finally {
             if ($null -eq $oldHome) { Remove-Item Env:HERMES_HOME -ErrorAction SilentlyContinue } else { $env:HERMES_HOME = $oldHome }
         }
+        $response | Should Match '--query-file\|'
         $response | Should Match 'First line with a .*quote'
         $response | Should Match 'Second line with .*quotes'
         $response | Should Match 'stub response'
@@ -205,8 +206,19 @@ Describe 'JARVIS Hermes process invocation' {
         $response | Should Match '--base-url\|http://127\.0\.0\.1:11434/v1'
         $response | Should Match '--reasoning\|none'
         $response | Should Match '-t\|clarify'
-        $response | Should Match 'chat\|-q\|'
+        $response | Should Match 'chat\|--query-file\|'
         $response | Should Match '--oneshot'
+    }
+
+    It 'does not pass an empty profile flag for steps without a profile' {
+        $root = Join-Path $TestDrive 'unprofiled-hermes-invocation'
+        New-Item -ItemType Directory -Force -Path $root | Out-Null
+        $promptFile = Join-Path $root 'prompt.txt'
+        $hermes = Join-Path $root 'fake-hermes.exe'
+        Write-JarvisUtf8Text -Path $promptFile -Text 'Return exactly one line.'
+        Add-Type -TypeDefinition 'using System; public static class FakeUnprofiledHermes { public static int Main(string[] args) { Console.WriteLine(String.Join("|", args)); return 0; } }' -OutputAssembly $hermes -OutputType ConsoleApplication
+        $response = Invoke-JarvisAgentTurn -PromptFile $promptFile -Profile '' -Hermes $hermes -WorkDirectory $root -StepNumber 32 -LogPath (Join-Path $root 'missing.log')
+        $response | Should Not Match '\|-p'
     }
 
     It 'uses a fresh Hermes workspace for each isolated turn' {
