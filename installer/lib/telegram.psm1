@@ -62,7 +62,8 @@ from pathlib import Path
 def _load_map():
     return json.loads((Path(__file__).parent / "topics.json").read_text())
 def _route(**kwargs):
-    source = kwargs.get("source")
+    event = kwargs.get("event")
+    source = getattr(event, "source", None)
     if source is None: return
     if not getattr(source, "thread_id", None) or getattr(source, "profile", None): return
     mapping = _load_map()
