@@ -152,6 +152,8 @@ Describe 'JARVIS Hermes process invocation' {
         $response | Should Match '--base-url\|http://127\.0\.0\.1:11434/v1'
         $response | Should Match '--reasoning\|none'
         $response | Should Match '-t\|clarify'
+        $response | Should Match 'chat\|-q\|'
+        $response | Should Match '--oneshot'
     }
 
     It 'uses a fresh Hermes workspace for each isolated turn' {
