@@ -59,7 +59,7 @@ for ($n = $start; $n -le $end; $n++) {
         $ready = Test-JarvisOllamaReady -Processes $servers -Tags $tags
         if (-not $ready.Ready) { throw $ready.Message }
     }
-    if ($n -gt 35) { throw "Step $n not implemented: the current milestone stops after step 35." }
+    if ($n -gt 43) { throw "Step $n not implemented: the current milestone stops after step 43." }
     switch ($n) {
         1 { if (-not $DryRun) { foreach ($f in @('USER.md','MEMORY.md')) { Backup-JarvisFile (Join-Path $paths.HermesHome "memories\$f") (Join-Path $paths.StateRoot 'backups') -RelativeTo $paths.HermesHome -UndoPath $undoPath | Out-Null }; Write-JarvisMemoryEntry (Join-Path $paths.HermesHome 'memories\USER.md') "$($form.name) works as: $($form.work). Time zone: $($form.timezone). Hours: $($form.hours). Weather city: $($form.weather_city)."; Write-JarvisMemoryEntry (Join-Path $paths.HermesHome 'memories\MEMORY.md') "JARVIS is chief of staff. Top priority: $($form.priority)." } }
         2 { if (-not $DryRun) { Backup-JarvisFile (Join-Path $paths.HermesHome 'memories\USER.md') (Join-Path $paths.StateRoot 'backups') -RelativeTo $paths.HermesHome -UndoPath $undoPath | Out-Null; Write-JarvisMemoryEntry (Join-Path $paths.HermesHome 'memories\USER.md') "Interview answers: $($form.interview -join ' | ')`nOpen questions: none recorded by installer." } }
@@ -172,9 +172,13 @@ for ($n = $start; $n -le $end; $n++) {
         33 { Invoke-JarvisStepAction -Number 33 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
         34 { Invoke-JarvisStepAction -Number 34 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
         35 { Invoke-JarvisStepAction -Number 35 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
-        36 { if ($WithComposio) { Invoke-JarvisStepAction -Number 36 -Paths $paths -Root $root -Form $form -DryRun:$DryRun } else { Show-Action 'Composio skipped by switch' } }
-        38 { if (-not $DryRun) { Write-JarvisBriefingConfig (Join-Path $paths.ProjectRoot 'briefing.json') $form.weather_city }; Invoke-JarvisStepAction -Number 38 -Paths $paths -Root $root -Form $form -DryRun:$DryRun }
-        41 { if ($WithTailscale -and -not $DryRun) { Install-JarvisAccess $paths.ProjectRoot -WithTailscale } }
+        36 { if ($WithComposio) { Show-Action 'Install Composio and pause for owner login and two browser links' } else { Show-Action 'Composio skipped by switch' } }
+        37 { Show-Action 'Install private-service allowlist and DEV/RESEARCH deny hooks' }
+        38 { if (-not $DryRun) { Write-JarvisBriefingConfig (Join-Path $paths.ProjectRoot 'briefing.json') $form.weather_city }; Invoke-JarvisStepAction -Number 38 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
+        39 { Show-Action 'Install throttled private-services poller and stale cache chips' }
+        40 { Invoke-JarvisStepAction -Number 40 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
+        41 { if ($WithTailscale) { Show-Action 'Install Tailscale, await owner authorization, and configure HTTPS serve' } else { Show-Action 'Tailscale skipped by switch' } }
+        42 { Invoke-JarvisStepAction -Number 42 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
         43 { if (-not $DryRun) { Test-JarvisInstall $paths.ProjectRoot $paths.HermesHome | ConvertTo-Json | Set-Content (Join-Path $paths.StateRoot 'verification.json') }; Invoke-JarvisStepAction -Number 43 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
         44 { if ($WithHomeAssistant) { Invoke-JarvisStepAction -Number 44 -Paths $paths -Root $root -Form $form -DryRun:$DryRun } else { Show-Action 'Home Assistant skipped by switch' } }
         default { throw "Step $n not implemented: this milestone is intentionally gated before dashboard, voice, comms, and finish work." }
