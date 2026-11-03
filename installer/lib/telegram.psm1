@@ -62,11 +62,12 @@ from pathlib import Path
 def _load_map():
     return json.loads((Path(__file__).parent / "topics.json").read_text())
 def _route(**kwargs):
-    source = kwargs.get("source") or {}
-    if not source.get("thread_id") or source.get("profile"): return
+    source = kwargs.get("source")
+    if source is None: return
+    if not getattr(source, "thread_id", None) or getattr(source, "profile", None): return
     mapping = _load_map()
-    if str(source.get("chat_id")) != str(mapping.get("chat_id")): return
-    profile = mapping.get("topics", {}).get(str(source.get("thread_id")))
+    if str(getattr(source, "chat_id", "")) != str(mapping.get("chat_id")): return
+    profile = mapping.get("topics", {}).get(str(getattr(source, "thread_id", "")))
     if profile: source.profile = profile
 def register(ctx):
     ctx.register_hook("pre_gateway_dispatch", _route)

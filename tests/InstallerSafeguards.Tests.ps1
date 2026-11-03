@@ -197,8 +197,11 @@ Describe 'JARVIS Telegram topic routing' {
     It 'writes a SessionSource profile assignment for the topic plugin' {
         $hermes = Join-Path $TestDrive 'hermes'
         Write-JarvisTelegramPlugin -HermesHome $hermes -TopicMap ([ordered]@{ chat_id = '-100'; topics = [ordered]@{ '35' = 'dev' } }) -OwnerName 'Test'
-        (Get-Content -Raw (Join-Path $hermes 'plugins\telegram_topic_profiles\__init__.py')) | Should Match 'source\.profile = profile'
-        (Get-Content -Raw (Join-Path $hermes 'plugins\telegram_topic_profiles\__init__.py')) | Should Not Match 'source\["profile"\]'
+        $plugin = Get-Content -Raw (Join-Path $hermes 'plugins\telegram_topic_profiles\__init__.py')
+        $plugin | Should Match 'source\.profile = profile'
+        $plugin | Should Match 'getattr\(source, "thread_id"'
+        $plugin | Should Not Match 'source\.get\('
+        $plugin | Should Not Match 'source\["profile"\]'
     }
 }
 
