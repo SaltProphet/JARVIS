@@ -126,3 +126,21 @@ Describe 'JARVIS Hermes process invocation' {
         $response | Should Match 'stub response'
     }
 }
+
+Describe 'JARVIS gateway command safeguards' {
+    It 'passes non-interactive restart flags and reports stub failure output' {
+        $root = Join-Path $TestDrive 'gateway-stub'
+        New-Item -ItemType Directory -Force -Path $root | Out-Null
+        $hermes = Join-Path $root 'fake-hermes.exe'
+        Add-Type -TypeDefinition 'using System; public static class FakeGatewayHermes { public static int Main(string[] args) { if (Array.IndexOf(args, "fail") >= 0) { Console.Error.WriteLine("refused: interactive confirmation required"); return 7; } if (Array.IndexOf(args, "status") >= 0) { Console.WriteLine("Gateway process running (PID 4321)"); } else { Console.WriteLine(String.Join(" ", args)); } return 0; } }' -OutputAssembly $hermes -OutputType ConsoleApplication
+        $restart = Invoke-JarvisHermesCommand -Hermes $hermes -Arguments @('gateway','restart','-y','--detach') -WorkingDirectory $root
+        Assert-JarvisHermesCommand -Result $restart -Label 'Hermes gateway restart'
+        ($restart.Output -join ' ') | Should Match '-y.*--detach'
+        $failure = Invoke-JarvisHermesCommand -Hermes $hermes -Arguments @('gateway','restart','fail') -WorkingDirectory $root
+        { Assert-JarvisHermesCommand -Result $failure -Label 'Hermes gateway restart' } | Should Throw
+        ($failure.Output -join ' ') | Should Match 'interactive confirmation required'
+        $status = Invoke-JarvisHermesCommand -Hermes $hermes -Arguments @('gateway','status') -WorkingDirectory $root
+        (Get-JarvisGatewayPid -Output $status.Output) | Should Be 4321
+        (Wait-JarvisGatewayRestart -Hermes $hermes -WorkingDirectory $root -PreviousPid 1234 -TimeoutSeconds 2) | Should Be 4321
+    }
+}

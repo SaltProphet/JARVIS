@@ -40,6 +40,38 @@ function Test-JarvisRequiredProcesses {
     $true
 }
 
+function Invoke-JarvisHermesCommand {
+    param([string]$Hermes = $(if ($env:JARVIS_HERMES_CLI) { $env:JARVIS_HERMES_CLI } else { 'hermes' }), [string[]]$Arguments, [string]$WorkingDirectory = $(if ($env:HERMES_HOME) { $env:HERMES_HOME } else { Join-Path $env:LOCALAPPDATA 'hermes' }))
+    if (-not (Test-Path -LiteralPath $WorkingDirectory -PathType Container)) { throw "Hermes working directory does not exist: $WorkingDirectory" }
+    $output = @(& $Hermes @Arguments 2>&1)
+    [pscustomobject]@{ Output = $output; ExitCode = $LASTEXITCODE; Arguments = $Arguments }
+}
+
+function Assert-JarvisHermesCommand {
+    param([psobject]$Result, [string]$Label)
+    if ($Result.ExitCode -ne 0) { throw "$Label failed (exit code $($Result.ExitCode)): $($Result.Output -join [Environment]::NewLine)" }
+    $true
+}
+
+function Get-JarvisGatewayPid {
+    param([object[]]$Output)
+    $text = $Output -join [Environment]::NewLine
+    if ($text -match '(?i)Gateway process running.*?PID\D+(\d+)') { return [int]$Matches[1] }
+    $null
+}
+
+function Wait-JarvisGatewayRestart {
+    param([string]$Hermes = $(if ($env:JARVIS_HERMES_CLI) { $env:JARVIS_HERMES_CLI } else { 'hermes' }), [string]$WorkingDirectory = $(if ($env:HERMES_HOME) { $env:HERMES_HOME } else { Join-Path $env:LOCALAPPDATA 'hermes' }), [int]$PreviousPid, [int]$TimeoutSeconds = 60)
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    do {
+        $status = Invoke-JarvisHermesCommand -Hermes $Hermes -Arguments @('gateway','status') -WorkingDirectory $WorkingDirectory
+        $pid = Get-JarvisGatewayPid -Output $status.Output
+        if ($status.ExitCode -eq 0 -and $pid -and (($PreviousPid -eq 0) -or ($pid -ne $PreviousPid))) { return $pid }
+        Start-Sleep -Seconds 1
+    } while ((Get-Date) -lt $deadline)
+    throw "Hermes gateway did not report 'Gateway process running' with a new PID within $TimeoutSeconds seconds. Previous PID: $PreviousPid. Last output: $($status.Output -join [Environment]::NewLine)"
+}
+
 function Write-JarvisUtf8Text {
     param([string]$Path, [AllowEmptyString()][string]$Text)
     [IO.File]::WriteAllText($Path, $Text, (New-Object Text.UTF8Encoding($false)))

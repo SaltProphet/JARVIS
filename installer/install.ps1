@@ -93,9 +93,13 @@ for ($n = $start; $n -le $end; $n++) {
                 $telegram = Read-JarvisUtf8Text (Join-Path $paths.StateRoot 'telegram.json') | ConvertFrom-Json
                 $map = @{ chat_id = $telegram.chat_id; topics = @{} }; foreach ($p in $telegram.topics.PSObject.Properties) { $map.topics[$p.Name] = $p.Value }
                 Write-JarvisTelegramPlugin $paths.HermesHome $map $form.name
-                & hermes plugins enable telegram_topic_profiles | Out-Null; if ($LASTEXITCODE -ne 0) { throw 'Hermes plugin enable failed.' }
-                & hermes config set gateway.multiplex_profiles true | Out-Null; if ($LASTEXITCODE -ne 0) { throw 'Hermes multiplex_profiles configuration failed.' }
-                & hermes gateway restart | Out-Null; if ($LASTEXITCODE -ne 0) { throw 'Hermes gateway restart failed.' }
+                $hermesCli = if ($env:JARVIS_HERMES_CLI) { $env:JARVIS_HERMES_CLI } else { 'hermes' }
+                $beforeRestart = Invoke-JarvisHermesCommand -Hermes $hermesCli -Arguments @('gateway','status') -WorkingDirectory $paths.HermesHome
+                $previousPid = Get-JarvisGatewayPid -Output $beforeRestart.Output
+                Assert-JarvisHermesCommand -Result (Invoke-JarvisHermesCommand -Hermes $hermesCli -Arguments @('plugins','enable','telegram_topic_profiles') -WorkingDirectory $paths.HermesHome) -Label 'Hermes plugin enable' | Out-Null
+                Assert-JarvisHermesCommand -Result (Invoke-JarvisHermesCommand -Hermes $hermesCli -Arguments @('config','set','gateway.multiplex_profiles','true') -WorkingDirectory $paths.HermesHome) -Label 'Hermes multiplex_profiles configuration' | Out-Null
+                Assert-JarvisHermesCommand -Result (Invoke-JarvisHermesCommand -Hermes $hermesCli -Arguments @('gateway','restart','-y','--detach') -WorkingDirectory $paths.HermesHome) -Label 'Hermes gateway restart' | Out-Null
+                Wait-JarvisGatewayRestart -Hermes $hermesCli -WorkingDirectory $paths.HermesHome -PreviousPid $previousPid | Out-Null
             } else { Show-Action 'Install and enable telegram_topic_profiles; set multiplexing; restart gateway' }
         }
         10 { Invoke-JarvisStepAction -Number 10 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
