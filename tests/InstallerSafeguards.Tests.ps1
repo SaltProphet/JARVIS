@@ -3,11 +3,13 @@ $common = Join-Path $PSScriptRoot '..\installer\lib\common.psm1'
 $identity = Join-Path $PSScriptRoot '..\installer\lib\identity.psm1'
 $telegram = Join-Path $PSScriptRoot '..\installer\lib\telegram.psm1'
 $logging = Join-Path $PSScriptRoot '..\installer\lib\logging.psm1'
+$survey = Join-Path $PSScriptRoot '..\installer\lib\survey.psm1'
 Import-Module $steps -Force
 Import-Module $common -Force
 Import-Module $identity -Force
 Import-Module $telegram -Force
 Import-Module $logging -Force
+Import-Module $survey -Force
 
 Describe 'JARVIS model safeguards' {
     It 'keeps external orientation out of Hermes and routes optional survey interpretation to DEV' {
@@ -28,6 +30,34 @@ Describe 'JARVIS model safeguards' {
         Test-JarvisStepPostCheck -Number 13 -Paths $paths -Root $TestDrive | Should Be $false
         Add-JarvisActivity $db 'DEV' 'Read-only data survey: limitations=test' 'completed'
         Add-JarvisActivity $db 'JARVIS' 'unrelated later activity' 'completed'
+        Test-JarvisStepPostCheck -Number 14 -Paths $paths -Root $TestDrive | Should Be $false
+    }
+
+    It 'rejects failed and incomplete step 13 activity rows' {
+        $project = Join-Path $TestDrive 'step-13-negative-project'
+        $paths = [pscustomobject]@{ ProjectRoot=$project; HermesHome=(Join-Path $TestDrive 'hermes'); StateRoot=(Join-Path $TestDrive 'step-13-state') }
+        $db = Join-Path $project 'agent-logs.db'
+        Add-JarvisActivity $db 'JARVIS' 'step=13; orientation=skipped; evidence=provider-neutral; routing=native-profile-routes; independence=external-builder-optional' 'failed'
+        Test-JarvisStepPostCheck -Number 13 -Paths $paths -Root $TestDrive | Should Be $false
+        Add-JarvisActivity $db 'DEV' 'step=13; orientation=recorded; evidence=provider-neutral; scope=layout,crew,routing,project,builder-only,independence; routing=native-profile-routes' 'completed'
+        Test-JarvisStepPostCheck -Number 13 -Paths $paths -Root $TestDrive | Should Be $false
+        Add-JarvisActivity $db 'JARVIS' 'step=13; orientation=skipped; evidence=incomplete' 'completed'
+        Test-JarvisStepPostCheck -Number 13 -Paths $paths -Root $TestDrive | Should Be $false
+    }
+
+    It 'rejects failed, incomplete, and structurally invalid step 14 evidence' {
+        $project = Join-Path $TestDrive 'step-14-negative-project'
+        $state = Join-Path $TestDrive 'step-14-negative-state'
+        New-Item -ItemType Directory -Force -Path $state | Out-Null
+        $paths = [pscustomobject]@{ ProjectRoot=$project; HermesHome=(Join-Path $TestDrive 'hermes'); StateRoot=$state }
+        $db = Join-Path $project 'agent-logs.db'
+        Add-JarvisActivity $db 'DEV' 'step=14; survey=completed; evidence=step-14-survey.json' 'failed'
+        Test-JarvisStepPostCheck -Number 14 -Paths $paths -Root $TestDrive | Should Be $false
+        Add-JarvisActivity $db 'JARVIS' 'step=14; survey=completed; evidence=step-14-survey.json' 'completed'
+        Test-JarvisStepPostCheck -Number 14 -Paths $paths -Root $TestDrive | Should Be $false
+        '{"step":14,"status":"completed","profile":"dev","source_count":0,"sources":[],"capabilities":[],"limitations":[]}' |
+            Set-Content (Join-Path $state 'step-14-survey.json') -Encoding UTF8
+        Add-JarvisActivity $db 'DEV' 'step=14; survey=completed; evidence=step-14-survey.json' 'completed'
         Test-JarvisStepPostCheck -Number 14 -Paths $paths -Root $TestDrive | Should Be $false
     }
 

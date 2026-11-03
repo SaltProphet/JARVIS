@@ -15,7 +15,6 @@ import sys
 
 path = pathlib.Path(sys.argv[1]).resolve()
 con = sqlite3.connect(path.as_uri() + '?mode=ro', uri=True, timeout=5)
-sensitive = re.compile(r'(secret|token|password|credential|api.?key|content|message|prompt|response|email|phone|address|chat.?id|thread.?id)', re.I)
 time_name = re.compile(r'(time|date|created|updated|started|ended|timestamp|run_at)', re.I)
 timestamp_types = set()
 
@@ -35,33 +34,36 @@ def timestamp_type(value):
     return None
 
 tables = [row[0] for row in con.execute('SELECT name FROM sqlite_master WHERE type = \'table\' AND name NOT LIKE \'sqlite_%\' ORDER BY name')]
-sample = None
+schemas = []
 quote = chr(34)
 for table in tables:
     escaped = table.replace(quote, quote + quote)
     cursor = con.execute('SELECT * FROM ' + quote + escaped + quote + ' LIMIT 1')
     row = cursor.fetchone()
-    if row is None:
-        continue
-    values = {}
-    for index, column in enumerate(cursor.description):
+    declared = {item[1]: item[2] for item in con.execute('PRAGMA table_info(' + quote + escaped + quote + ')')}
+    columns = []
+    for index, column in enumerate(cursor.description or []):
         key = column[0]
-        value = row[index]
+        value = row[index] if row is not None else None
         kind = timestamp_type(value) if time_name.search(key) else None
         if kind:
             timestamp_types.add(kind)
-        if sensitive.search(key):
-            values[key] = '[redacted]'
+        if value is None:
+            value_type = 'null'
+        elif isinstance(value, bool):
+            value_type = 'boolean'
+        elif isinstance(value, int):
+            value_type = 'integer'
+        elif isinstance(value, float):
+            value_type = 'number'
         elif isinstance(value, bytes):
-            values[key] = '<bytes:' + str(len(value)) + '>'
-        elif isinstance(value, str) and not kind:
-            values[key] = '[text]'
+            value_type = 'binary'
         else:
-            values[key] = value
-    if sample is None:
-        sample = {'table': table, 'values': values}
+            value_type = 'text'
+        columns.append({'name': key, 'declared_type': declared.get(key, ''), 'value_type': value_type, 'timestamp_type': kind})
+    schemas.append({'name': table, 'columns': columns})
 con.close()
-print(json.dumps({'tables': tables, 'timestamp_types': sorted(timestamp_types), 'sample': sample}, sort_keys=True))
+print(json.dumps({'tables': tables, 'timestamp_types': sorted(timestamp_types), 'sample': {'tables': schemas}}, sort_keys=True))
 '@
     try {
         $raw = & py -3.12 -c $code $Path 2>&1
@@ -89,28 +91,23 @@ function Get-JarvisJsonTimestampTypes {
     @($types | Sort-Object -Unique)
 }
 
-function ConvertTo-JarvisSanitizedValue {
+function ConvertTo-JarvisValueShape {
     param($Value, [string]$Name = '')
-    if ($Name -match '(?i)secret|token|password|credential|api.?key|content|message|prompt|response|email|phone|address|chat.?id|thread.?id') { return '[redacted]' }
-    if ($null -eq $Value) { return $null }
+    if ($null -eq $Value) { return 'null' }
     if ($Value -is [array]) {
         $items = @($Value)
         if ($items.Count -eq 0) { return @() }
-        return @(ConvertTo-JarvisSanitizedValue -Value $items[0])
+        return @(ConvertTo-JarvisValueShape -Value $items[0])
     }
     if ($Value -is [pscustomobject]) {
         $result = [ordered]@{}
-        foreach ($property in $Value.PSObject.Properties) { $result[$property.Name] = ConvertTo-JarvisSanitizedValue -Value $property.Value -Name $property.Name }
+        foreach ($property in $Value.PSObject.Properties) { $result[$property.Name] = ConvertTo-JarvisValueShape -Value $property.Value -Name $property.Name }
         return [pscustomobject]$result
     }
-    if ($Value -is [string]) {
-        if ($Name -match '(?i)time|date|created|updated|started|ended|timestamp|run_at') {
-            $parsed = [datetimeoffset]::MinValue
-            if ([datetimeoffset]::TryParse($Value, [ref]$parsed)) { return $Value }
-        }
-        return '[text]'
-    }
-    $Value
+    if ($Value -is [bool]) { return 'boolean' }
+    if ($Value -is [byte] -or $Value -is [int16] -or $Value -is [int] -or $Value -is [long] -or $Value -is [single] -or $Value -is [double] -or $Value -is [decimal]) { return 'number' }
+    if ($Value -is [string]) { return 'text' }
+    'unknown'
 }
 
 function Get-JarvisJsonSurveySource {
@@ -121,10 +118,73 @@ function Get-JarvisJsonSurveySource {
     try {
         $value = [IO.File]::ReadAllText($Path) | ConvertFrom-Json
         $keys = if ($value -is [pscustomobject]) { @($value.PSObject.Properties.Name | Sort-Object) } else { @() }
-        [pscustomobject][ordered]@{ name=$Name; kind='json'; path=$Path; available=$true; tables=@(); keys=$keys; timestamp_types=@(Get-JarvisJsonTimestampTypes $value); sample=(ConvertTo-JarvisSanitizedValue $value); error=$null }
+        [pscustomobject][ordered]@{ name=$Name; kind='json'; path=$Path; available=$true; tables=@(); keys=$keys; timestamp_types=@(Get-JarvisJsonTimestampTypes $value); sample=(ConvertTo-JarvisValueShape $value); error=$null }
     } catch {
         [pscustomobject][ordered]@{ name=$Name; kind='json'; path=$Path; available=$false; tables=@(); keys=@(); timestamp_types=@(); sample=$null; error='malformed or unreadable' }
     }
+}
+
+function Get-JarvisDirectorySurveySource {
+    param([string]$Name, [string]$Path)
+    if (-not (Test-Path -LiteralPath $Path -PathType Container)) {
+        return [pscustomobject][ordered]@{ name=$Name; kind='directory'; path=$Path; available=$false; tables=@(); keys=@('item_count','extensions','last_write_time'); timestamp_types=@(); sample=$null; item_count=0; error='missing' }
+    }
+    try {
+        $files = @(Get-ChildItem -LiteralPath $Path -File -Recurse -ErrorAction Stop)
+        $extensions = @($files | ForEach-Object { if ($_.Extension) { $_.Extension.ToLowerInvariant() } else { '[none]' } } | Sort-Object -Unique)
+        [pscustomobject][ordered]@{
+            name=$Name; kind='directory'; path=$Path; available=$true; tables=@(); keys=@('item_count','extensions','last_write_time')
+            timestamp_types=$(if ($files.Count -gt 0) { @('filesystem-datetime') } else { @() })
+            sample=[pscustomobject][ordered]@{ item='file'; fields=@('extension','last_write_time','length'); value_types=@('text','filesystem-datetime','number') }
+            item_count=$files.Count; extensions=$extensions; error=$null
+        }
+    } catch {
+        [pscustomobject][ordered]@{ name=$Name; kind='directory'; path=$Path; available=$false; tables=@(); keys=@('item_count','extensions','last_write_time'); timestamp_types=@(); sample=$null; item_count=0; error='unreadable' }
+    }
+}
+
+function Get-JarvisDataSurveyEvidenceHash {
+    param([psobject]$Evidence)
+    $payload = [pscustomobject][ordered]@{
+        format_version=$Evidence.format_version; step=$Evidence.step; status=$Evidence.status; profile=$Evidence.profile
+        source_count=$Evidence.source_count; sources=@($Evidence.sources)
+        capabilities=@($Evidence.capabilities); limitations=@($Evidence.limitations)
+    }
+    $bytes = (New-Object Text.UTF8Encoding($false)).GetBytes(($payload | ConvertTo-Json -Depth 20 -Compress))
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { -join @($sha.ComputeHash($bytes) | ForEach-Object { $_.ToString('x2') }) } finally { $sha.Dispose() }
+}
+
+function Test-JarvisDataSurveyEvidence {
+    param([string]$Path)
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $false }
+    try { $evidence = [IO.File]::ReadAllText($Path) | ConvertFrom-Json } catch { return $false }
+    $evidenceProperties = @($evidence.PSObject.Properties.Name)
+    foreach ($property in @('format_version','step','status','profile','source_count','sources','capabilities','limitations','evidence_hash')) {
+        if ($evidenceProperties -notcontains $property) { return $false }
+    }
+    if ($evidence.step -ne 14 -or $evidence.status -ne 'completed' -or $evidence.profile -ne 'dev') { return $false }
+    if ([string]::IsNullOrWhiteSpace([string]$evidence.evidence_hash) -or $evidence.evidence_hash -ne (Get-JarvisDataSurveyEvidenceHash -Evidence $evidence)) { return $false }
+    $sources = @($evidence.sources)
+    if ($sources.Count -eq 0 -or [int]$evidence.source_count -ne $sources.Count) { return $false }
+    if (@($evidence.capabilities).Count -eq 0 -or @($evidence.limitations).Count -eq 0) { return $false }
+    $required = @(
+        'hermes-default-state','hermes-profile-dev-state','hermes-profile-research-state','hermes-profile-assistant-state',
+        'hermes-kanban','hermes-cron-default','hermes-cron-dev','hermes-cron-research','hermes-cron-assistant',
+        'hermes-gateway-state','hermes-gateway-logs','jarvis-activity-log'
+    )
+    $names = @($sources | ForEach-Object name)
+    if (@($names | Sort-Object -Unique).Count -ne $names.Count) { return $false }
+    foreach ($name in $required) { if ($names -notcontains $name) { return $false } }
+    foreach ($source in $sources) {
+        $properties = @($source.PSObject.Properties.Name)
+        foreach ($property in @('name','kind','path','available','tables','keys','timestamp_types','sample','error')) {
+            if ($properties -notcontains $property) { return $false }
+        }
+        if ($source.kind -notin @('sqlite','json','directory')) { return $false }
+        if ($source.kind -eq 'directory' -and $properties -notcontains 'item_count') { return $false }
+    }
+    $true
 }
 
 function Get-JarvisDataSurvey {
@@ -153,6 +213,7 @@ function Get-JarvisDataSurvey {
         $sources += Get-JarvisJsonSurveySource -Name "hermes-cron-$profile" -Path (Join-Path $Paths.HermesHome "profiles\$profile\cron\jobs.json")
     }
     $sources += Get-JarvisJsonSurveySource -Name 'hermes-gateway-state' -Path (Join-Path $Paths.HermesHome 'gateway_state.json')
+    $sources += Get-JarvisDirectorySurveySource -Name 'hermes-gateway-logs' -Path (Join-Path $Paths.HermesHome 'logs')
     $sources += Get-JarvisSqliteSurveySource -Name 'jarvis-activity-log' -Path (Join-Path $Paths.ProjectRoot 'agent-logs.db')
 
     [pscustomobject][ordered]@{

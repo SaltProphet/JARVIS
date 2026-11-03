@@ -83,12 +83,17 @@ function Test-JarvisStepPostCheck {
         13 {
             $rows = @(Get-JarvisActivity -DatabasePath (Join-Path $Paths.ProjectRoot 'agent-logs.db'))
             if ($rows.Count -eq 0) { return $false }
-            return ($rows[-1].task_description -match '^Builder orientation: (skipped|provider-neutral)')
+            $row = $rows[-1]
+            if ($row.agent_name -ne 'JARVIS' -or $row.status -ne 'completed') { return $false }
+            if ($row.task_description -match '^step=13; orientation=skipped; evidence=provider-neutral; routing=native-profile-routes; independence=external-builder-optional$') { return $true }
+            return ($row.task_description -match '^step=13; orientation=recorded; evidence=provider-neutral; scope=layout,crew,routing,project,builder-only,independence; routing=native-profile-routes$')
         }
         14 {
             $rows = @(Get-JarvisActivity -DatabasePath (Join-Path $Paths.ProjectRoot 'agent-logs.db'))
             if ($rows.Count -eq 0) { return $false }
-            return ($rows[-1].agent_name -eq 'DEV' -and $rows[-1].task_description -match '^Read-only data survey:' -and $rows[-1].task_description -match 'limitations=')
+            $row = $rows[-1]
+            if ($row.agent_name -ne 'DEV' -or $row.status -ne 'completed' -or $row.task_description -ne 'step=14; survey=completed; evidence=step-14-survey.json') { return $false }
+            return (Test-JarvisDataSurveyEvidence -Path (Join-Path $Paths.StateRoot 'step-14-survey.json'))
         }
         default { return $false }
     }

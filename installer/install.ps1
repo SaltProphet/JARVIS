@@ -120,19 +120,23 @@ for ($n = $start; $n -le $end; $n++) {
         13 {
             if ($DryRun) { Show-Action $(if ($WithBuilderOrientation) { 'Record provider-neutral external builder orientation' } else { 'Record durable builder orientation skip' }) }
             elseif ($WithBuilderOrientation) {
-                Add-JarvisActivity $logPath 'JARVIS' 'Builder orientation: provider-neutral external builder; layout=Hermes home/profiles; crew=JARVIS routes, DEV builds, RESEARCH verifies, ASSISTANT supports; routing=native profile_routes; project=jarvis-mission-control; role=builder-only; Hermes crew keeps running when the builder closes.' 'completed'
+                Add-JarvisActivity $logPath 'JARVIS' 'step=13; orientation=recorded; evidence=provider-neutral; scope=layout,crew,routing,project,builder-only,independence; routing=native-profile-routes' 'completed'
             } else {
-                Add-JarvisActivity $logPath 'JARVIS' 'Builder orientation: skipped (WithBuilderOrientation not selected); native profile_routes and the Hermes crew remain independent of every coding application.' 'completed'
+                Add-JarvisActivity $logPath 'JARVIS' 'step=13; orientation=skipped; evidence=provider-neutral; routing=native-profile-routes; independence=external-builder-optional' 'completed'
             }
         }
         14 {
             if ($DryRun) { Show-Action 'Survey Hermes and JARVIS data sources read-only; record sanitized DEV-attributed facts' }
             else {
                 $survey = Get-JarvisDataSurvey -Paths $paths
-                $available = @($survey.sources | Where-Object available).Count
-                $timestamps = @($survey.sources | ForEach-Object { @($_.timestamp_types) } | Sort-Object -Unique) -join ','
-                $names = @($survey.sources | ForEach-Object name) -join ','
-                Add-JarvisActivity $logPath 'DEV' "Read-only data survey: available=$available/$(@($survey.sources).Count); limitations=$($survey.limitations -join ' '); timestamp-types=$timestamps; sources=$names" 'completed'
+                $evidence = [pscustomobject][ordered]@{
+                    format_version=1; step=14; status='completed'; profile='dev'; source_count=@($survey.sources).Count
+                    sources=@($survey.sources); capabilities=@($survey.capabilities); limitations=@($survey.limitations)
+                }
+                $evidence | Add-Member -NotePropertyName evidence_hash -NotePropertyValue (Get-JarvisDataSurveyEvidenceHash -Evidence $evidence)
+                New-Item -ItemType Directory -Force -Path $paths.StateRoot | Out-Null
+                Write-JarvisUtf8Text -Path (Join-Path $paths.StateRoot 'step-14-survey.json') -Text ($evidence | ConvertTo-Json -Depth 20)
+                Add-JarvisActivity $logPath 'DEV' 'step=14; survey=completed; evidence=step-14-survey.json' 'completed'
             }
         }
         15 { if (-not $DryRun) { Install-JarvisDashboardFiles $paths.ProjectRoot (Join-Path $root 'dashboard'); Register-JarvisDashboardTask $paths.ProjectRoot } }
