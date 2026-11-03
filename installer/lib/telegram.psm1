@@ -51,29 +51,23 @@ function New-JarvisTelegramTopics {
     $topics
 }
 
-function Write-JarvisTelegramPlugin {
-    param([string]$HermesHome, [hashtable]$TopicMap, [string]$OwnerName)
-    $dir = Join-Path $HermesHome 'plugins\telegram_topic_profiles'; New-Item -ItemType Directory -Force -Path $dir | Out-Null
-    Write-JarvisUtf8Text -Path (Join-Path $dir 'plugin.yaml') -Text (@("name: telegram_topic_profiles", "version: 1.0.0", 'description: "Route Telegram forum topics to Hermes profiles."', "author: $OwnerName", 'kind: standalone') -join "`n")
-    Write-JarvisUtf8Text -Path (Join-Path $dir 'topics.json') -Text ($TopicMap | ConvertTo-Json -Depth 5)
-    $plugin = @'
-import json
-from pathlib import Path
-def _load_map():
-    return json.loads((Path(__file__).parent / "topics.json").read_text())
-def _route(**kwargs):
-    event = kwargs.get("event")
-    source = getattr(event, "source", None)
-    if source is None: return
-    if not getattr(source, "thread_id", None) or getattr(source, "profile", None): return
-    mapping = _load_map()
-    if str(getattr(source, "chat_id", "")) != str(mapping.get("chat_id")): return
-    profile = mapping.get("topics", {}).get(str(getattr(source, "thread_id", "")))
-    if profile: source.profile = profile
-def register(ctx):
-    ctx.register_hook("pre_gateway_dispatch", _route)
-'@
-    Write-JarvisUtf8Text -Path (Join-Path $dir '__init__.py') -Text $plugin
+function Get-JarvisTelegramProfileRoutes {
+    param([object]$TopicMap)
+    $routes = @()
+    $topics = if ($TopicMap.topics -is [Collections.IDictionary]) { @($TopicMap.topics.GetEnumerator()) } else { @($TopicMap.topics.PSObject.Properties) }
+    foreach ($topic in $topics) {
+        $topicId = if ($topic -is [Collections.DictionaryEntry]) { $topic.Key } else { $topic.Name }
+        $profile = if ($topic -is [Collections.DictionaryEntry]) { $topic.Value } else { $topic.Value }
+        if ($profile -notin @('dev','research','assistant')) { continue }
+        $routes += [ordered]@{
+            name = "telegram-$profile"
+            platform = 'telegram'
+            profile = $profile
+            chat_id = [string]$TopicMap.chat_id
+            thread_id = [string]$topicId
+        }
+    }
+    @($routes)
 }
 
 Export-ModuleMember -Function *-Jarvis*

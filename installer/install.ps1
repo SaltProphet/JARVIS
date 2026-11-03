@@ -92,15 +92,18 @@ for ($n = $start; $n -le $end; $n++) {
                 Backup-JarvisFile (Join-Path $paths.HermesHome 'config.yaml') (Join-Path $paths.StateRoot 'backups') -RelativeTo $paths.HermesHome -UndoPath $undoPath | Out-Null
                 $telegram = Read-JarvisUtf8Text (Join-Path $paths.StateRoot 'telegram.json') | ConvertFrom-Json
                 $map = @{ chat_id = $telegram.chat_id; topics = @{} }; foreach ($p in $telegram.topics.PSObject.Properties) { $map.topics[$p.Name] = $p.Value }
-                Write-JarvisTelegramPlugin $paths.HermesHome $map $form.name
+                $routes = @(Get-JarvisTelegramProfileRoutes -TopicMap ([pscustomobject]$map))
+                $routeLiteral = '[' + (($routes | ForEach-Object { "{name: $($_.name), platform: telegram, profile: $($_.profile), chat_id: '$($_.chat_id)', thread_id: '$($_.thread_id)'}" }) -join ', ') + ']'
                 $hermesCli = if ($env:JARVIS_HERMES_CLI) { $env:JARVIS_HERMES_CLI } else { 'hermes' }
                 $beforeRestart = Invoke-JarvisHermesCommand -Hermes $hermesCli -Arguments @('gateway','status') -WorkingDirectory $paths.HermesHome
                 $previousPid = Get-JarvisGatewayPid -Output $beforeRestart.Output
-                Assert-JarvisHermesCommand -Result (Invoke-JarvisHermesCommand -Hermes $hermesCli -Arguments @('plugins','enable','telegram_topic_profiles') -WorkingDirectory $paths.HermesHome) -Label 'Hermes plugin enable' | Out-Null
+                $quotedRoutes = '"' + ([regex]::Replace($routeLiteral, '(\\*)"', '$1$1\"') -replace '(\\+)$', '$1$1') + '"'
+                Assert-JarvisHermesCommand -Result (Invoke-JarvisHermesCommand -Hermes $hermesCli -Arguments @('config','set','profile_routes',$quotedRoutes) -WorkingDirectory $paths.HermesHome) -Label 'Hermes Telegram profile routes' | Out-Null
+                Assert-JarvisHermesCommand -Result (Invoke-JarvisHermesCommand -Hermes $hermesCli -Arguments @('plugins','disable','telegram_topic_profiles') -WorkingDirectory $paths.HermesHome) -Label 'Hermes topic plugin disable' | Out-Null
                 Assert-JarvisHermesCommand -Result (Invoke-JarvisHermesCommand -Hermes $hermesCli -Arguments @('config','set','gateway.multiplex_profiles','true') -WorkingDirectory $paths.HermesHome) -Label 'Hermes multiplex_profiles configuration' | Out-Null
                 Assert-JarvisHermesCommand -Result (Invoke-JarvisHermesCommand -Hermes $hermesCli -Arguments @('gateway','restart','-y','--detach') -WorkingDirectory $paths.HermesHome) -Label 'Hermes gateway restart' | Out-Null
                 Wait-JarvisGatewayRestart -Hermes $hermesCli -WorkingDirectory $paths.HermesHome -PreviousPid $previousPid | Out-Null
-            } else { Show-Action 'Install and enable telegram_topic_profiles; set multiplexing; restart gateway' }
+            } else { Show-Action 'Set native Telegram profile_routes; disable topic plugin; set multiplexing; restart gateway' }
         }
         10 { Invoke-JarvisStepAction -Number 10 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
         11 { if (-not $DryRun) { New-Item -ItemType Directory -Force -Path $paths.ProjectRoot | Out-Null; Initialize-JarvisActivityLog $logPath } }

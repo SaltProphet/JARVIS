@@ -54,7 +54,12 @@ function Test-JarvisStepPostCheck {
             }
             return $true
         }
-        9 { $config = Join-Path $Paths.HermesHome 'config.yaml'; return (Test-Path (Join-Path $Paths.HermesHome 'plugins\telegram_topic_profiles\plugin.yaml')) -and (Test-Path (Join-Path $Paths.HermesHome 'plugins\telegram_topic_profiles\topics.json')) -and (Test-Path $config) -and ((Read-JarvisUtf8Text $config) -match 'multiplex_profiles') }
+        9 {
+            $config = Join-Path $Paths.HermesHome 'config.yaml'
+            if (-not (Test-Path $config)) { return $false }
+            $text = Read-JarvisUtf8Text $config
+            return $text -match 'multiplex_profiles' -and $text -match 'profile_routes' -and $text -match 'profile: dev' -and $text -match 'profile: research' -and $text -match 'profile: assistant'
+        }
         10 { $turn = Join-Path $Paths.StateRoot 'agent-turn-10.txt'; $text = if (Test-Path $turn) { Read-JarvisUtf8Text $turn } else { '' }; return $text -match 'DEV' -and $text -match 'RESEARCH' -and $text -match 'ASSISTANT' -and $text -match 'works|failed' }
         11 { $db = Join-Path $Paths.ProjectRoot 'agent-logs.db'; return (Test-Path $db) -and ((Get-Item $db).Length -gt 0) }
         12 {

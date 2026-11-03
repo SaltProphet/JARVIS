@@ -17,10 +17,7 @@ Describe 'Milestone 1 post-checks' {
         foreach ($profile in @('dev','research','assistant')) { New-Item -ItemType Directory -Force -Path "$hermes\profiles\$profile\memories" | Out-Null; Set-Content "$hermes\profiles\$profile\SOUL.md" $profile; Set-Content "$hermes\profiles\$profile\memories\MEMORY.md" 'log-task' }
         Set-Content "$state\agent-turn-06.txt" 'JARVIS DEV RESEARCH ASSISTANT'
         [ordered]@{ chat_id = '-100'; topics = [ordered]@{ DEV = 'dev'; RESEARCH = 'research'; ASSISTANT = 'assistant' } } | ConvertTo-Json | Set-Content "$state\telegram.json"
-        New-Item -ItemType Directory -Force -Path "$hermes\plugins\telegram_topic_profiles" | Out-Null
-        Set-Content "$hermes\plugins\telegram_topic_profiles\plugin.yaml" 'name: telegram_topic_profiles'
-        Set-Content "$hermes\plugins\telegram_topic_profiles\topics.json" '{}'
-        Set-Content "$hermes\config.yaml" 'multiplex_profiles: true'
+        Set-Content "$hermes\config.yaml" "multiplex_profiles: true`nprofile_routes:`n- name: telegram-dev`n  platform: telegram`n  profile: dev`n- name: telegram-research`n  platform: telegram`n  profile: research`n- name: telegram-assistant`n  platform: telegram`n  profile: assistant"
         Set-Content "$state\agent-turn-10.txt" 'DEV works; RESEARCH works; ASSISTANT works'
         Initialize-JarvisActivityLog (Join-Path $root 'agent-logs.db')
         foreach ($agent in @('JARVIS','DEV','RESEARCH','ASSISTANT')) { Add-JarvisActivity (Join-Path $root 'agent-logs.db') $agent 'smoke' 'completed' 'test-model' }

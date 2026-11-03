@@ -194,17 +194,19 @@ Describe 'JARVIS gateway command safeguards' {
 }
 
 Describe 'JARVIS Telegram topic routing' {
-    It 'writes a SessionSource profile assignment for the topic plugin' {
-        $hermes = Join-Path $TestDrive 'hermes'
-        Write-JarvisTelegramPlugin -HermesHome $hermes -TopicMap ([ordered]@{ chat_id = '-100'; topics = [ordered]@{ '35' = 'dev' } }) -OwnerName 'Test'
-        $plugin = Get-Content -Raw (Join-Path $hermes 'plugins\telegram_topic_profiles\__init__.py')
-        $plugin | Should Match 'source\.profile = profile'
-        $plugin | Should Match 'event = kwargs\.get\("event"\)'
-        $plugin | Should Match 'source = getattr\(event, "source"'
-        $plugin | Should Match 'getattr\(source, "thread_id"'
-        $plugin | Should Not Match 'source\.get\('
-        $plugin | Should Not Match 'source\["profile"\]'
+    It 'builds native Hermes profile routes for specialist topics only' {
+        $map = [pscustomobject]@{
+            chat_id = '-1003967974233'
+            topics = [pscustomobject]@{ '35' = 'dev'; '36' = 'research'; '37' = 'assistant' }
+        }
+        $routes = @(Get-JarvisTelegramProfileRoutes -TopicMap $map)
+        $routes.Count | Should Be 3
+        ($routes | Where-Object profile -eq 'dev').thread_id | Should Be '35'
+        ($routes | Where-Object profile -eq 'research').thread_id | Should Be '36'
+        ($routes | Where-Object profile -eq 'assistant').thread_id | Should Be '37'
+        ($routes | Where-Object profile -eq 'dev').chat_id | Should Be '-1003967974233'
     }
+
 }
 
 Describe 'JARVIS numeric step formatting' {
