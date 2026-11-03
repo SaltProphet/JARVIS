@@ -2,7 +2,7 @@ Set-StrictMode -Version Latest
 
 function Get-JarvisStepPrompt {
     param([int]$Number, [string]$Root)
-    $names = @{ 4='04-plan-crew.txt'; 6='06-team-awareness.txt'; 10='10-first-words.txt'; 13='13-builder-orientation.txt'; 14='14-data-survey.txt'; 19='19-home-state.txt'; 20='20-agents.txt'; 21='21-chat.txt'; 22='22-content.txt'; 23='23-document-protocol.txt'; 25='25-research.txt'; 26='26-models.txt'; 43='43-final-verification.txt' }
+    $names = @{ 4='04-plan-crew.txt'; 6='06-team-awareness.txt'; 10='10-first-words.txt'; 13='13-builder-orientation.txt'; 14='14-data-survey.txt'; 19='19-home-state.txt'; 20='20-agents.txt'; 21='21-chat.txt'; 22='22-content.txt'; 23='23-document-protocol.txt'; 25='25-research.txt'; 26='26-models.txt'; 29='29-voice-gate.txt'; 30='30-voice-control.txt'; 31='31-greetings.txt'; 32='32-push-to-talk.txt'; 33='33-conversation.txt'; 34='34-owner-shortcuts.txt'; 35='35-comms-dictation.txt'; 43='43-final-verification.txt' }
     if ($names.ContainsKey($Number)) { Join-Path $Root ("prompts\$($names[$Number])") } else { $null }
 }
 
