@@ -139,8 +139,7 @@ def shelves() -> dict:
         folder = ROOT / "content" / agent["key"]
         docs = []
         for path in sorted(folder.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True) if folder.exists() else []:
-            text = path.read_text(encoding="utf-8", errors="replace")
-            docs.append({"file": path.name, "title": text.splitlines()[0].lstrip("# ") if text else path.stem, "bytes": path.stat().st_size, "words": len(text.split()), "sections": text.count("\n#"), "read_min": max(1, len(text.split()) // 220), "created": path.stat().st_ctime, "modified": path.stat().st_mtime})
+            docs.append(content_metadata(agent["key"], path))
         total += len(docs)
         result.append({"agent": agent["key"], "count": len(docs), "docs": docs})
     return {"total": total, "shelves": result}
@@ -155,6 +154,30 @@ def read_cron_jobs() -> list[dict]:
     except (OSError, ValueError):
         return []
 
+
+def valid_agent(agent: object) -> bool:
+    return isinstance(agent, str) and agent in {item["key"] for item in CREW}
+
+
+def valid_content_name(name: object) -> bool:
+    if not isinstance(name, str) or not name or name != Path(name).name:
+        return False
+    if any(char in name for char in ("/", "\\", "\x00")) or ".." in name:
+        return False
+    return Path(name).suffix.lower() == ".md"
+
+
+def content_metadata(agent: str, path: Path) -> dict:
+    text = path.read_text(encoding="utf-8", errors="replace")
+    lines = text.splitlines()
+    title = next((line.lstrip("# ").strip() for line in lines if line.startswith("#")), path.stem)
+    date = path.name[:10] if re.match(r"^\d{4}-\d{2}-\d{2}_", path.name) else None
+    return {"file": path.name, "title": title, "author": agent.upper(), "date": date,
+            "bytes": path.stat().st_size, "words": len(text.split()),
+            "sections": sum(1 for line in lines if line.startswith("#")),
+            "read_min": max(1, len(text.split()) // 220),
+            "created": path.stat().st_ctime, "modified": path.stat().st_mtime}
+
 def read_voice_config() -> dict:
     default = {"scenario": 1, "el_key_present": False, "el_voice": None, "el_voice_name": None}
     try:
@@ -164,6 +187,20 @@ def read_voice_config() -> dict:
     except (OSError, ValueError):
         pass
     return default
+
+
+def cron_payload() -> dict:
+    jobs = []
+    for raw in read_cron_jobs():
+        if not isinstance(raw, dict):
+            continue
+        jobs.append({"id": str(raw.get("id", raw.get("job_id", ""))),
+                     "name": str(raw.get("name", raw.get("title", "Unnamed job"))),
+                     "schedule": raw.get("schedule", raw.get("cron", "")),
+                     "enabled": bool(raw.get("enabled", not raw.get("paused", False))),
+                     "next_run": raw.get("next_run", raw.get("nextRun")),
+                     "agent": raw.get("agent", "default")})
+    return {"jobs": jobs}
 
 def state() -> dict:
     rows = db_rows()
@@ -302,8 +339,12 @@ class Handler(BaseHTTPRequestHandler):
             if user.exists(): first = user.read_text(encoding="utf-8", errors="replace").split()[0] if user.read_text(encoding="utf-8", errors="replace").split() else ""
             return json_response(self, {"name": first if first.isalpha() else ""})
         if path == "/api/models": return json_response(self, {"agents": [{**a, "model": None, "provider": "custom"} for a in CREW], "providers": [{"slug": "custom", "name": "Custom", "models": ["gpt-oss:20b"], "total": 1}], "loading": False, "error": None})
-        if path == "/api/chat/history": return json_response(self, {"session": None, "telegram": False, "messages": []})
-        if path == "/api/cron": return json_response(self, {"jobs": read_cron_jobs()})
+        if path == "/api/chat/history":
+            agent = query.get("agent", ["default"])[0]
+            if not valid_agent(agent):
+                return json_response(self, {"error": "unknown agent"}, 400)
+            return json_response(self, {"session": None, "telegram": agent == "default", "messages": []})
+        if path == "/api/cron": return json_response(self, cron_payload())
         if path == "/api/voice/config": return json_response(self, read_voice_config())
         if path == "/docs.md": return self.send_file(ROOT / "docs.md", "text/markdown; charset=utf-8")
         if path in ("/", "/template", "/styles.css", "/script.js", "/favicon.svg", "/upload"):
@@ -313,10 +354,11 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_file(ROOT / path.lstrip("/"))
         if path == "/api/content/read":
             agent, file = query.get("agent", [""])[0], query.get("file", [""])[0]
-            if "/" in file or ".." in file: return json_response(self, {"error": "not found"}, 404)
+            if not valid_agent(agent) or not valid_content_name(file): return json_response(self, {"error": "not found"}, 404)
             target = ROOT / "content" / agent / file
             if not target.is_file(): return json_response(self, {"error": "not found"}, 404)
-            text = target.read_text(encoding="utf-8", errors="replace"); return json_response(self, {"title": text.splitlines()[0].lstrip("# ") if text else file, "text": text, "file": file})
+            text = target.read_text(encoding="utf-8", errors="replace")
+            return json_response(self, {**content_metadata(agent, target), "text": text})
         return json_response(self, {"error": "not found"}, 404)
     def send_file(self, path: Path, content_type: str | None = None):
         if not path.is_file(): return json_response(self, {"error": "not found"}, 404)
@@ -371,6 +413,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/chat/send":
             try:
                 payload = json.loads(raw); agent, text = payload["agent"], payload["text"]
+                if not valid_agent(agent) or not isinstance(text, str) or not text.strip() or len(text) > 10000:
+                    raise ValueError("invalid chat request")
                 cmd = ["hermes"] + ([] if agent == "default" else ["-p", agent]) + ["-z", text]
                 result = subprocess.run(cmd, capture_output=True, text=True, timeout=300, env={**os.environ, "HERMES_HOME": str(HERMES)})
                 return json_response(self, result.stdout.strip() if result.returncode == 0 else result.stderr.strip(), 200 if result.returncode == 0 else 502, "text/plain; charset=utf-8")
@@ -399,7 +443,7 @@ class Handler(BaseHTTPRequestHandler):
             return json_response(self, {"ok": result.returncode == 0, "error": result.stderr.strip() if result.returncode else None}, 200 if result.returncode == 0 else 502)
         if path == "/api/content/delete":
             agent, file = query.get("agent", [""])[0], query.get("file", [""])[0]
-            if "/" in file or ".." in file: return json_response(self, {"error": "not found"}, 404)
+            if not valid_agent(agent) or not valid_content_name(file): return json_response(self, {"error": "not found"}, 404)
             target = ROOT / "content" / agent / file
             if not target.is_file(): return json_response(self, {"error": "not found"}, 404)
             target.unlink(); return json_response(self, {"ok": True})
