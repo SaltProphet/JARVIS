@@ -15,4 +15,8 @@ Describe 'Kokoro runtime selection' {
         $runtime.executable | Should Be 'C:\Python312\python.exe'
         $runtime.version | Should Be '3.12.13'
     }
+
+    It 'rejects a non-3.12 interpreter even when it is the default' {
+        { Select-JarvisVoicePython -DefaultPython 'C:\Python311\python.exe' } | Should Throw
+    }
 }

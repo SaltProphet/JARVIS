@@ -1,4 +1,4 @@
-"""Loopback Kokoro voice service. The model is optional until installed."""
+"""Loopback Kokoro voice service."""
 from __future__ import annotations
 import hashlib, json, os, threading, wave
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -19,22 +19,14 @@ loading = True
 def load_model():
     global engine, error, loading
     try:
-        if MODEL.is_file() and VOICES.is_file():
-            from kokoro_onnx import Kokoro
-            engine = Kokoro(str(MODEL), str(VOICES))
+        if not MODEL.is_file() or not VOICES.is_file():
+            raise FileNotFoundError("Kokoro model files are missing")
+        from kokoro_onnx import Kokoro
+        engine = Kokoro(str(MODEL), str(VOICES))
     except Exception as exc:
         error = str(exc)
     finally:
         loading = False
-
-def wav_silence(seconds=0.25):
-    frames = int(24000 * seconds)
-    data = b"\x00\x00" * frames
-    import io
-    out = io.BytesIO()
-    with wave.open(out, "wb") as w:
-        w.setnchannels(1); w.setsampwidth(2); w.setframerate(24000); w.writeframes(data)
-    return out.getvalue()
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *_): pass
@@ -48,17 +40,31 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path != "/say": return self.send_json({"error": "not found"}, 404)
         query = parse_qs(parsed.query); voice = query.get("voice", ["bm_daniel"])[0]; speed = query.get("speed", ["1.0"])[0]
         if voice not in KNOWN: return self.send_json({"error": "unknown voice"}, 400)
-        text = self.rfile.read(int(self.headers.get("Content-Length", "0"))).decode("utf-8", "replace")
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            return self.send_json({"error": "invalid content length"}, 400)
+        if length <= 0 or length > 10000:
+            return self.send_json({"error": "text body must be 1-10000 bytes"}, 400)
+        text = self.rfile.read(length).decode("utf-8", "replace").strip()
+        if not text:
+            return self.send_json({"error": "text is required"}, 400)
+        try:
+            speed_value = float(speed)
+        except ValueError:
+            return self.send_json({"error": "invalid speed"}, 400)
+        if not 0.5 <= speed_value <= 2.0:
+            return self.send_json({"error": "speed must be between 0.5 and 2.0"}, 400)
+        if loading or engine is None:
+            return self.send_json({"error": error or "Kokoro is not ready"}, 503)
         CACHE.mkdir(exist_ok=True); key = hashlib.sha256(f"{voice}|{speed}|{text}".encode()).hexdigest(); path = CACHE / f"{key}.wav"
         if not path.exists():
             with lock:
                 if not path.exists():
-                    if engine is not None:
-                        samples, sample_rate = engine.create(text, voice=voice, speed=float(speed), lang="en-gb")
-                        import soundfile as sf
-                        sf.write(path, samples, 24000, format="WAV", subtype="PCM_16")
-                    else: path.write_bytes(wav_silence())
-        body = path.read_bytes(); self.send_response(200); self.send_header("Content-Type", "audio/wav"); self.send_header("Content-Length", str(len(body))); self.send_header("X-Jarvis-Voice-Engine", "kokoro" if engine else "placeholder"); self.end_headers(); self.wfile.write(body)
+                    samples, sample_rate = engine.create(text, voice=voice, speed=speed_value, lang="en-gb")
+                    import soundfile as sf
+                    sf.write(path, samples, 24000, format="WAV", subtype="PCM_16")
+        body = path.read_bytes(); self.send_response(200); self.send_header("Content-Type", "audio/wav"); self.send_header("Content-Length", str(len(body))); self.send_header("X-Jarvis-Voice-Engine", "kokoro"); self.end_headers(); self.wfile.write(body)
 
 if __name__ == "__main__":
     threading.Thread(target=load_model, daemon=True).start()

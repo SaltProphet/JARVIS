@@ -2,8 +2,8 @@ Set-StrictMode -Version Latest
 
 function Select-JarvisVoicePython {
     param([string]$Python312, [string]$DefaultPython)
-    if ($Python312) { return [pscustomobject]@{ Executable = $Python312; Version = '3.12' } }
-    if ($DefaultPython -and $DefaultPython -notmatch '3\.14') { return [pscustomobject]@{ Executable = $DefaultPython; Version = 'detected' } }
+    if ($Python312 -and $Python312 -match '(?i)(python312|python[-_.]?3\.12|3\.12)') { return [pscustomobject]@{ Executable = $Python312; Version = '3.12' } }
+    if ($DefaultPython -and $DefaultPython -match '(?i)(python312|python[-_.]?3\.12|3\.12)') { return [pscustomobject]@{ Executable = $DefaultPython; Version = '3.12' } }
     throw 'Kokoro requires Python 3.12; install it with py -3.12 or uv.'
 }
 
