@@ -149,6 +149,15 @@ function Test-JarvisStepPostCheck {
             $scriptText = [IO.File]::ReadAllText($script)
             return $conversationText -match 'PUSH_TO_TALK_MS\s*=\s*5000' -and $conversationText -match 'startPushToTalk' -and $conversationText -match 'finishPushToTalk' -and $scriptText -match 'setTimeout\(\(\) => stopSpeechTurn' -and $scriptText -match 'acceptDictation\(generation'
         }
+        33 {
+            $dashboard = Join-Path $Root 'dashboard'
+            $index = Join-Path $dashboard 'index.html'
+            $script = Join-Path $dashboard 'script.js'
+            if (-not (Test-Path -LiteralPath $index -PathType Leaf) -or -not (Test-Path -LiteralPath $script -PathType Leaf)) { return $false }
+            $indexText = [IO.File]::ReadAllText($index)
+            $scriptText = [IO.File]::ReadAllText($script)
+            return $indexText -match 'conversation-overlay' -and $indexText -match 'conversation-transcript' -and $scriptText -match 'renderTranscript' -and $scriptText -match 'stopRecognition' -and $scriptText -match 'jarvisRestTimer'
+        }
         default { return $false }
     }
 }

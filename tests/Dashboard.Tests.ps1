@@ -35,4 +35,9 @@ Describe 'Dashboard contract helpers' {
         $paths = [pscustomobject]@{ ProjectRoot = $TestDrive; HermesHome = (Join-Path $TestDrive 'hermes'); StateRoot = (Join-Path $TestDrive 'state') }
         Test-JarvisStepPostCheck -Number 32 -Paths $paths -Root (Join-Path $PSScriptRoot '..\installer') -DryRun:$false | Should Be $true
     }
+
+    It 'verifies the repository conversation overlay artifact for step 33' {
+        $paths = [pscustomobject]@{ ProjectRoot = $TestDrive; HermesHome = (Join-Path $TestDrive 'hermes'); StateRoot = (Join-Path $TestDrive 'state') }
+        Test-JarvisStepPostCheck -Number 33 -Paths $paths -Root (Join-Path $PSScriptRoot '..\installer') -DryRun:$false | Should Be $true
+    }
 }

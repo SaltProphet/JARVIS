@@ -20,6 +20,7 @@ class ConversationState {
 
   startPushToTalk(agent = this.selectedAgent) {
     if (!this.beginListening(agent)) return null;
+    this.transcript = '';
     this.dictationGeneration += 1;
     return this.dictationGeneration;
   }

@@ -30,7 +30,24 @@ function setPhase(label) {
     status.className = 'conversation-status';
     document.getElementById('orb').after(status);
   }
-  status.textContent = label;
+   status.textContent = label;
+   const overlayStatus = document.querySelector('#conversation-overlay .eyebrow');
+   if (overlayStatus) overlayStatus.textContent = `Live transcript · ${label}`;
+}
+
+function renderTranscript() {
+  const target = document.getElementById('conversation-transcript');
+  if (target && conversation) target.textContent = conversation.transcript || 'Waiting for speech.';
+}
+
+function stopRecognition() {
+  const recognition = window.__jarvisRecognition;
+  window.__jarvisRecognition = null;
+  if (!recognition) return;
+  recognition.onresult = null;
+  recognition.onend = null;
+  recognition.onerror = null;
+  recognition.stop();
 }
 
 async function sendMessage(text, agent = selected.key) {
@@ -42,8 +59,10 @@ async function sendMessage(text, agent = selected.key) {
 
 function beginSpeechTurn() {
   if (!conversation) return;
+  if (window.__jarvisRestTimer) { clearTimeout(window.__jarvisRestTimer); window.__jarvisRestTimer = null; }
   const generation = conversation.startPushToTalk(selected.key);
   if (generation === null) return;
+  renderTranscript();
   setPhase('LISTENING');
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!Recognition) { setPhase('TYPE A MESSAGE'); return; }
@@ -52,7 +71,10 @@ function beginSpeechTurn() {
   recognition.interimResults = true;
   recognition.onresult = event => {
     for (let index = event.resultIndex; index < event.results.length; index += 1) {
-       if (event.results[index].isFinal) conversation.acceptDictation(generation, event.results[index][0].transcript);
+       if (event.results[index].isFinal) {
+         conversation.acceptDictation(generation, event.results[index][0].transcript);
+         renderTranscript();
+       }
     }
   };
    recognition.onerror = () => { if (generation === conversation.dictationGeneration) setPhase('MIC ERROR'); };
@@ -64,11 +86,11 @@ function beginSpeechTurn() {
 
 function stopSpeechTurn(generation = conversation?.dictationGeneration) {
   if (window.__jarvisPushTimer) { clearTimeout(window.__jarvisPushTimer); window.__jarvisPushTimer = null; }
-  if (window.__jarvisRecognition) { window.__jarvisRecognition.stop(); window.__jarvisRecognition = null; }
+  stopRecognition();
   if (conversation && conversation.finishPushToTalk(generation)) {
     setPhase('WAITING FOR REPLY');
     const text = conversation.transcript;
-     sendMessage(text).then(reply => { document.getElementById('reply').textContent = reply; conversation.beginSpeaking(); setPhase('REPLY'); setTimeout(() => conversation.interrupt(), REST_MS); }).catch(error => { document.getElementById('reply').textContent = error.message; conversation.interrupt(); setPhase('ERROR'); });
+     sendMessage(text).then(reply => { document.getElementById('reply').textContent = reply; conversation.beginSpeaking(); setPhase('REPLY'); window.__jarvisRestTimer = setTimeout(() => { conversation.interrupt(); renderTranscript(); }, REST_MS); }).catch(error => { document.getElementById('reply').textContent = error.message; conversation.interrupt(); renderTranscript(); setPhase('ERROR'); });
   }
 }
 
@@ -79,7 +101,7 @@ function installConversationControls() {
   orb.tabIndex = 0;
   orb.onclick = () => conversation?.phase === 'listening' ? stopSpeechTurn() : beginSpeechTurn();
   document.addEventListener('keydown', event => {
-     if (event.key === 'Escape') { if (window.__jarvisPushTimer) clearTimeout(window.__jarvisPushTimer); if (window.__jarvisRecognition) window.__jarvisRecognition.stop(); conversation?.interrupt(); setPhase('READY'); return; }
+     if (event.key === 'Escape') { if (window.__jarvisPushTimer) clearTimeout(window.__jarvisPushTimer); if (window.__jarvisRestTimer) clearTimeout(window.__jarvisRestTimer); stopRecognition(); conversation?.interrupt(); renderTranscript(); setPhase('READY'); return; }
     if (event.code === 'Space' && !ConversationState.isTextControl(event.target)) { event.preventDefault(); if (event.type === 'keydown') beginSpeechTurn(); }
     if (/^[1-4]$/.test(event.key) && !event.ctrlKey && !event.metaKey && !ConversationState.isTextControl(event.target)) selectAgent(['default', 'dev', 'research', 'assistant'][Number(event.key) - 1]);
   });
