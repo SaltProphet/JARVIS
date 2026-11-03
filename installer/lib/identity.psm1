@@ -113,6 +113,12 @@ function Get-JarvisInstallerToolset {
     'clarify'
 }
 
+function Get-JarvisAgentLogText {
+    param([string]$Path)
+    if (-not (Test-Path -LiteralPath $Path)) { return $null }
+    try { Read-JarvisUtf8Text $Path } catch { $null }
+}
+
 function Invoke-JarvisAgentTurn {
     param([string]$PromptFile, [string]$Profile = 'default', [string]$Hermes = 'hermes', [string]$WorkDirectory, [int]$StepNumber = 0, [int]$TimeoutMinutes = 25, [string]$LogPath = $(Join-Path $env:LOCALAPPDATA 'hermes\logs\agent.log'), [switch]$SkipOllamaCheck, [switch]$Retry)
     if ([string]::IsNullOrWhiteSpace($WorkDirectory)) { $WorkDirectory = if ($env:HERMES_HOME) { $env:HERMES_HOME } else { Join-Path $env:LOCALAPPDATA 'hermes' } }
@@ -132,7 +138,8 @@ function Invoke-JarvisAgentTurn {
             Start-Sleep -Seconds 1
             $elapsed = (Get-Date) - $started
             if ((Get-Date) -ge $nextHeartbeat) { Write-Host (Format-JarvisModelHeartbeat -Step $StepNumber -Elapsed $elapsed); $nextHeartbeat = $nextHeartbeat.AddSeconds(30) }
-            if (Test-Path $LogPath) { $log = Read-JarvisUtf8Text $LogPath; if ($log.Length -gt $lastLogLength) { $new = $log.Substring($lastLogLength); $lastLogLength = $log.Length; $new -split "`r?`n" | Where-Object { $_ -match 'APIConnectionError|Connection error|API call failed' } | ForEach-Object { Write-Host $_ } } }
+            $log = Get-JarvisAgentLogText $LogPath
+            if ($null -ne $log -and $log.Length -gt $lastLogLength) { $new = $log.Substring($lastLogLength); $lastLogLength = $log.Length; $new -split "`r?`n" | Where-Object { $_ -match 'APIConnectionError|Connection error|API call failed' } | ForEach-Object { Write-Host $_ } }
             if (-not $SkipOllamaCheck) { try { Invoke-RestMethod -Uri 'http://127.0.0.1:11434/api/tags' -TimeoutSec 5 | Out-Null } catch { throw "Ollama stopped responding during step $StepNumber. Start it and rerun; the installer resumes at step $StepNumber." } }
             if ($elapsed.TotalMinutes -ge $TimeoutMinutes) { $process.Kill(); throw (Get-JarvisModelTimeoutMessage -Step $StepNumber -Minutes $TimeoutMinutes) }
         }

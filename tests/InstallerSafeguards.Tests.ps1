@@ -162,6 +162,13 @@ Describe 'JARVIS Hermes process invocation' {
         $response = Invoke-JarvisAgentTurn -PromptFile $promptFile -Hermes $hermes -WorkDirectory $root -StepNumber 10 -LogPath (Join-Path $root 'missing.log')
         $response | Should Match '--in\|'
     }
+
+    It 'ignores a transient agent log lock while polling a model turn' {
+        $log = Join-Path $TestDrive 'locked-agent.log'
+        Write-JarvisUtf8Text -Path $log -Text 'existing'
+        Mock Read-JarvisUtf8Text { throw [IO.IOException]::new('log is locked') } -ModuleName identity
+        Get-JarvisAgentLogText -Path $log | Should Be $null
+    }
 }
 
 Describe 'JARVIS gateway command safeguards' {
