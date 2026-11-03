@@ -49,7 +49,7 @@ for ($n = $start; $n -le $end; $n++) {
     if (@($progress.completed) -contains $n) { continue }
     Show-Action "Step $n pre-check"
     if (-not (Test-JarvisStepPreCheck -Number $n -Paths $paths -DryRun:$DryRun)) { throw "Step $n pre-check failed." }
-    $isModelStep = $null -ne (Get-JarvisStepPrompt -Number $n -Root $root)
+    $isModelStep = ($n -notin @(13,14)) -and ($null -ne (Get-JarvisStepPrompt -Number $n -Root $root))
     if ($isModelStep -and -not $DryRun) {
         $servers = @(Get-Process -Name ollama -ErrorAction SilentlyContinue)
         if ($servers.Count -eq 0) { throw "Ollama isn't running. Start the Ollama app once, then rerun." }
@@ -59,7 +59,7 @@ for ($n = $start; $n -le $end; $n++) {
         $ready = Test-JarvisOllamaReady -Processes $servers -Tags $tags
         if (-not $ready.Ready) { throw $ready.Message }
     }
-    if ($n -gt 18) { throw "Step $n not implemented: the current milestone stops after step 18." }
+    if ($n -gt 26) { throw "Step $n not implemented: the current milestone stops after step 26." }
     switch ($n) {
         1 { if (-not $DryRun) { foreach ($f in @('USER.md','MEMORY.md')) { Backup-JarvisFile (Join-Path $paths.HermesHome "memories\$f") (Join-Path $paths.StateRoot 'backups') -RelativeTo $paths.HermesHome -UndoPath $undoPath | Out-Null }; Write-JarvisMemoryEntry (Join-Path $paths.HermesHome 'memories\USER.md') "$($form.name) works as: $($form.work). Time zone: $($form.timezone). Hours: $($form.hours). Weather city: $($form.weather_city)."; Write-JarvisMemoryEntry (Join-Path $paths.HermesHome 'memories\MEMORY.md') "JARVIS is chief of staff. Top priority: $($form.priority)." } }
         2 { if (-not $DryRun) { Backup-JarvisFile (Join-Path $paths.HermesHome 'memories\USER.md') (Join-Path $paths.StateRoot 'backups') -RelativeTo $paths.HermesHome -UndoPath $undoPath | Out-Null; Write-JarvisMemoryEntry (Join-Path $paths.HermesHome 'memories\USER.md') "Interview answers: $($form.interview -join ' | ')`nOpen questions: none recorded by installer." } }
@@ -155,9 +155,14 @@ for ($n = $start; $n -le $end; $n++) {
             if ($DryRun) { Show-Action 'Install backup protocol and create the v0.1 pre-wiring baseline' }
             else { Install-JarvisDashboardBackup -ProjectRoot $paths.ProjectRoot -DashboardRoot (Join-Path $root 'dashboard') -BackupRoot $paths.BackupRoot -UndoPath $undoPath -StateRoot $paths.StateRoot | Out-Null }
         }
+        19 { Invoke-JarvisStepAction -Number 19 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
+        20 { Invoke-JarvisStepAction -Number 20 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
+        21 { Invoke-JarvisStepAction -Number 21 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
+        22 { Invoke-JarvisStepAction -Number 22 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
         23 { if (-not $DryRun) { Install-JarvisComms $paths.ProjectRoot }; Invoke-JarvisStepAction -Number 23 -Paths $paths -Root $root -Form $form -DryRun:$DryRun }
         24 { if ($WithSerpApi) { Invoke-JarvisStepAction -Number 24 -Paths $paths -Root $root -Form $form -DryRun:$DryRun } else { Show-Action 'SerpApi skipped by switch' } }
         25 { if ($WithSerpApi -and -not $DryRun) { Install-JarvisResearch $paths.ProjectRoot (Join-Path $paths.HermesHome 'profiles\research') -WithSerpApi } }
+        26 { Invoke-JarvisStepAction -Number 26 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
         27 { if (-not $DryRun) { $voice = Install-JarvisVoiceRuntime $paths.VoiceRoot (Join-Path $paths.StateRoot 'voice-runtime.json') (Join-Path $root 'voice\voice-server.py'); Register-JarvisVoiceTask $paths.VoiceRoot $voice.Executable } else { Show-Action 'Create Kokoro venv with py -3.12 and record exact interpreter' } }
         28 { if ($WithElevenLabs) { Invoke-JarvisStepAction -Number 28 -Paths $paths -Root $root -Form $form -DryRun:$DryRun } else { Show-Action 'ElevenLabs skipped by switch' } }
         36 { if ($WithComposio) { Invoke-JarvisStepAction -Number 36 -Paths $paths -Root $root -Form $form -DryRun:$DryRun } else { Show-Action 'Composio skipped by switch' } }
