@@ -118,7 +118,10 @@ function Invoke-JarvisAgentTurn {
     if ([string]::IsNullOrWhiteSpace($WorkDirectory)) { $WorkDirectory = if ($env:HERMES_HOME) { $env:HERMES_HOME } else { Join-Path $env:LOCALAPPDATA 'hermes' } }
     if (-not (Test-Path -LiteralPath $WorkDirectory -PathType Container)) { throw "Hermes work directory does not exist: $WorkDirectory" }
     $prompt = Get-JarvisInstallerPrompt -PromptFile $PromptFile -StepNumber $StepNumber -Retry:$Retry
-    $processArguments = @('--safe-mode', '--ignore-user-config', '--ignore-rules', '--model', 'gpt-oss:20b', '--reasoning', 'none', '-t', (Get-JarvisInstallerToolset -StepNumber $StepNumber))
+    $turnWorkspace = Join-Path ([IO.Path]::GetTempPath()) ("jarvis-installer-step-{0}-{1}" -f $StepNumber, [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Force -Path $turnWorkspace | Out-Null
+    $quotedWorkspace = '"' + ([regex]::Replace($turnWorkspace, '(\\*)"', '$1$1\"') -replace '(\\+)$', '$1$1') + '"'
+    $processArguments = @('--safe-mode', '--ignore-user-config', '--ignore-rules', '--model', 'gpt-oss:20b', '--reasoning', 'none', '-t', (Get-JarvisInstallerToolset -StepNumber $StepNumber), '--in', $quotedWorkspace)
     if ($Profile -ne 'default') { $processArguments += @('-p', $Profile) }
     $processArguments += @('-z', ('"' + ([regex]::Replace($prompt, '(\\*)"', '$1$1\"') -replace '(\\+)$', '$1$1') + '"'))
     $outFile = [IO.Path]::GetTempFileName(); $errFile = [IO.Path]::GetTempFileName(); $started = Get-Date
@@ -139,7 +142,10 @@ function Invoke-JarvisAgentTurn {
         $exitCode = if ($null -eq $process.ExitCode) { 0 } else { [int]$process.ExitCode }
         if ($exitCode -ne 0) { throw "Hermes turn failed for ${Profile} (exit $exitCode): $($result -join ' ')" }
         $result -join [Environment]::NewLine
-    } finally { Remove-Item $outFile,$errFile -Force -ErrorAction SilentlyContinue }
+    } finally {
+        Remove-Item $outFile,$errFile -Force -ErrorAction SilentlyContinue
+        Remove-Item $turnWorkspace -Recurse -Force -ErrorAction SilentlyContinue
+    }
 }
 
 Export-ModuleMember -Function *-Jarvis*

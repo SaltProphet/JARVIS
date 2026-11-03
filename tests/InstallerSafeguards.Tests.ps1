@@ -151,6 +151,17 @@ Describe 'JARVIS Hermes process invocation' {
         $response | Should Match '--reasoning\|none'
         $response | Should Match '-t\|clarify'
     }
+
+    It 'uses a fresh Hermes workspace for each isolated turn' {
+        $root = Join-Path $TestDrive 'fresh-hermes-workspace'
+        New-Item -ItemType Directory -Force -Path $root | Out-Null
+        $promptFile = Join-Path $root 'prompt.txt'
+        $hermes = Join-Path $root 'fake-hermes.exe'
+        Write-JarvisUtf8Text -Path $promptFile -Text 'Return exactly one line.'
+        Add-Type -TypeDefinition 'using System; public static class FakeFreshWorkspaceHermes { public static int Main(string[] args) { Console.WriteLine(String.Join("|", args)); return 0; } }' -OutputAssembly $hermes -OutputType ConsoleApplication
+        $response = Invoke-JarvisAgentTurn -PromptFile $promptFile -Hermes $hermes -WorkDirectory $root -StepNumber 10 -LogPath (Join-Path $root 'missing.log')
+        $response | Should Match '--in\|'
+    }
 }
 
 Describe 'JARVIS gateway command safeguards' {
