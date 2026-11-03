@@ -70,4 +70,13 @@ Describe 'Dashboard contract helpers' {
         (Get-Content (Join-Path $project 'private-services.json') -Raw) | Should Match 'owner-approval-pending'
         (Get-Content (Join-Path $PSScriptRoot '..\installer\hooks\deny-private-services.py') -Raw) | Should Match 'pre_tool_call'
     }
+
+    It 'formats a three-sentence briefing and preserves owner triggers' {
+        Import-Module (Join-Path $PSScriptRoot '..\installer\lib\briefing.psm1') -Force
+        $text = Format-JarvisBriefing 'Sunny' 'Mail' 'Calendar'
+        @($text -split '\. ' | Where-Object { $_ }).Count | Should Be 3
+        $path = Join-Path $TestDrive 'briefing.json'
+        Write-JarvisBriefingConfig $path 'Greenwood'
+        (Get-Content $path -Raw) | Should Match 'run my morning briefing'
+    }
 }

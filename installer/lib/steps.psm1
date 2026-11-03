@@ -184,6 +184,12 @@ function Test-JarvisStepPostCheck {
             $stateText = [IO.File]::ReadAllText($state); $hookText = [IO.File]::ReadAllText($hook)
             return $stateText -match 'GMAIL_FETCH_EMAILS' -and $stateText -match 'GOOGLECALENDAR_EVENTS_LIST' -and $stateText -match 'DEV' -and $stateText -match 'RESEARCH' -and $hookText -match 'def pre_tool_call'
         }
+        38 {
+            $config = Join-Path $Paths.ProjectRoot 'briefing.json'
+            if (-not (Test-Path -LiteralPath $config -PathType Leaf)) { return $false }
+            $text = [IO.File]::ReadAllText($config)
+            return $text -match 'weather_city' -and $text -match 'max_sentences' -and $text -match 'run my morning briefing' -and $text -match 'what did I miss'
+        }
         default { return $false }
     }
 }
