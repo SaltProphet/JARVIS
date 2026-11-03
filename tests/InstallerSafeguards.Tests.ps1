@@ -8,6 +8,12 @@ Import-Module $identity -Force
 Import-Module $telegram -Force
 
 Describe 'JARVIS model safeguards' {
+    It 'registers the provider-neutral builder orientation prompt' {
+        $prompt = Get-JarvisStepPrompt -Number 13 -Root (Join-Path $PSScriptRoot '..\installer')
+        [IO.Path]::GetFileName($prompt) | Should Be '13-builder-orientation.txt'
+        Test-Path -LiteralPath $prompt | Should Be $true
+    }
+
     It 'rejects no Ollama server' {
         $result = Test-JarvisOllamaReady -Processes @() -Tags @('gpt-oss:20b')
         $result.Message | Should Be "Ollama isn't running. Start the Ollama app once, then rerun."

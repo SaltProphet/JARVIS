@@ -121,5 +121,5 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\installer\install.ps1
 Optional integrations are explicitly opt-in:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\installer\install.ps1" -WithClaudeCode -WithSerpApi -WithElevenLabs -WithComposio -WithTailscale -WithHomeAssistant
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\installer\install.ps1" -WithBuilderOrientation -WithSerpApi -WithElevenLabs -WithComposio -WithTailscale -WithHomeAssistant
 ```

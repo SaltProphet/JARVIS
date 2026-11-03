@@ -6,7 +6,7 @@ param(
     [ValidateRange(1,48)][int]$Through,
     [ValidateRange(1,120)][int]$ModelTimeoutMinutes = 25,
     [switch]$Uninstall,
-    [switch]$WithClaudeCode,
+    [switch]$WithBuilderOrientation,
     [switch]$WithSerpApi,
     [switch]$WithElevenLabs,
     [switch]$WithComposio,
@@ -117,7 +117,7 @@ for ($n = $start; $n -le $end; $n++) {
                 foreach ($agent in @('JARVIS','DEV','RESEARCH','ASSISTANT')) { Add-JarvisActivity $logPath $agent 'installer smoke test' 'completed' 'gpt-oss:20b' }
             }
         }
-        13 { if ($WithClaudeCode) { Invoke-JarvisStepAction -Number 13 -Paths $paths -Root $root -Form $form -DryRun:$DryRun } else { Show-Action 'Claude Code skipped by switch' } }
+        13 { if ($WithBuilderOrientation) { Invoke-JarvisStepAction -Number 13 -Paths $paths -Root $root -Form $form -DryRun:$DryRun } else { Show-Action 'Builder orientation skipped by switch' } }
         14 { Invoke-JarvisStepAction -Number 14 -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes }
         15 { if (-not $DryRun) { Install-JarvisDashboardFiles $paths.ProjectRoot (Join-Path $root 'dashboard'); Register-JarvisDashboardTask $paths.ProjectRoot } }
         16 { Invoke-JarvisStepAction -Number 16 -Paths $paths -Root $root -Form $form -DryRun:$DryRun }

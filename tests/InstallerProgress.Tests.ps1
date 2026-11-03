@@ -18,6 +18,25 @@ Describe 'Installer progress with a fake Hermes home' {
         }
     }
 
+    It 'accepts the provider-neutral builder orientation switch' {
+        $fakeHermes = Join-Path $TestDrive 'builder-hermes'
+        $fakeState = Join-Path $TestDrive 'builder-state'
+        New-Item -ItemType Directory -Force -Path $fakeHermes,$fakeState | Out-Null
+        $oldHermes = $env:HERMES_HOME
+        $oldState = $env:JARVIS_STATE_ROOT
+        $message = ''
+        try {
+            $env:HERMES_HOME = $fakeHermes
+            $env:JARVIS_STATE_ROOT = $fakeState
+            try { & (Join-Path $PSScriptRoot '..\installer\install.ps1') -DryRun -Step 13 -WithBuilderOrientation 2>&1 | Out-Null }
+            catch { $message = $_.Exception.Message }
+            $message | Should Match 'Step 13 not implemented: Milestone 1 stops after step 12\.'
+        } finally {
+            if ($null -eq $oldHermes) { Remove-Item Env:HERMES_HOME -ErrorAction SilentlyContinue } else { $env:HERMES_HOME = $oldHermes }
+            if ($null -eq $oldState) { Remove-Item Env:JARVIS_STATE_ROOT -ErrorAction SilentlyContinue } else { $env:JARVIS_STATE_ROOT = $oldState }
+        }
+    }
+
     It 'saves step one progress without nested array conversion errors' {
         $fakeHermes = Join-Path $TestDrive 'hermes'
         $fakeState = Join-Path $TestDrive 'state'
