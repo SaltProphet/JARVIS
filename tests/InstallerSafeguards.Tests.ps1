@@ -113,7 +113,7 @@ Describe 'JARVIS Hermes process invocation' {
         $hermes = Join-Path $root 'fake-hermes.exe'
         $quote = [char]34
         Write-JarvisUtf8Text -Path $promptFile -Text "First line with a $quote quote $quote`r`nSecond line with $quote quotes $quote"
-        Add-Type -TypeDefinition 'using System; public static class FakeHermes { public static int Main(string[] args) { Console.WriteLine(args[1]); Console.WriteLine("stub response"); return 0; } }' -OutputAssembly $hermes -OutputType ConsoleApplication
+        Add-Type -TypeDefinition 'using System; public static class FakeHermes { public static int Main(string[] args) { Console.WriteLine(String.Join("|", args)); Console.WriteLine("stub response"); return 0; } }' -OutputAssembly $hermes -OutputType ConsoleApplication
         $oldHome = $env:HERMES_HOME
         try {
             $env:HERMES_HOME = $root
@@ -124,6 +124,31 @@ Describe 'JARVIS Hermes process invocation' {
         $response | Should Match 'First line with a .*quote'
         $response | Should Match 'Second line with .*quotes'
         $response | Should Match 'stub response'
+    }
+
+    It 'builds a narrow prompt with a strict retry reminder' {
+        $promptFile = Join-Path $TestDrive 'narrow-prompt.txt'
+        Write-JarvisUtf8Text -Path $promptFile -Text 'Return a compact table with lane and result.'
+        $prompt = Get-JarvisInstallerPrompt -PromptFile $promptFile -StepNumber 10 -Retry
+        $prompt | Should Match '^ONE JOB: complete only installer step 10\.'
+        $prompt | Should Match 'Return a compact table with lane and result\.'
+        $prompt | Should Match 'Do not review, read or describe config files\.'
+        $prompt.TrimEnd() | Should Match 'Retry once now: follow the exact required output format and do not do anything else\.$'
+    }
+
+    It 'uses isolated Hermes settings and the smallest step toolset' {
+        $root = Join-Path $TestDrive 'isolated-hermes-invocation'
+        New-Item -ItemType Directory -Force -Path $root | Out-Null
+        $promptFile = Join-Path $root 'prompt.txt'
+        $hermes = Join-Path $root 'fake-hermes.exe'
+        Write-JarvisUtf8Text -Path $promptFile -Text 'Return exactly one line.'
+        Add-Type -TypeDefinition 'using System; public static class FakeIsolatedHermes { public static int Main(string[] args) { Console.WriteLine(String.Join("|", args)); return 0; } }' -OutputAssembly $hermes -OutputType ConsoleApplication
+        $response = Invoke-JarvisAgentTurn -PromptFile $promptFile -Hermes $hermes -WorkDirectory $root -StepNumber 10 -LogPath (Join-Path $root 'missing.log')
+        $response | Should Match '--safe-mode'
+        $response | Should Match '--ignore-user-config'
+        $response | Should Match '--ignore-rules'
+        $response | Should Match '--reasoning\|none'
+        $response | Should Match '-t\|clarify'
     }
 }
 

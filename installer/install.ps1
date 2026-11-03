@@ -133,6 +133,11 @@ for ($n = $start; $n -le $end; $n++) {
         default { throw "Step $n not implemented: this milestone is intentionally gated before dashboard, voice, comms, and finish work." }
     }
     $postPassed = Test-JarvisStepPostCheck -Number $n -Paths $paths -Root $root -DryRun:$DryRun
+    if (-not $postPassed -and $null -ne (Get-JarvisStepPrompt -Number $n -Root $root)) {
+        Write-Host "Step $n post-check failed; retrying the model turn once with a stricter reminder."
+        Invoke-JarvisStepAction -Number $n -Paths $paths -Root $root -Form $form -DryRun:$DryRun -TimeoutMinutes $ModelTimeoutMinutes -Retry | Out-Null
+        $postPassed = Test-JarvisStepPostCheck -Number $n -Paths $paths -Root $root -DryRun:$DryRun
+    }
     if (-not $postPassed) { throw (Get-JarvisPostCheckFailureMessage -Step $n -Output $(if (Test-Path (Join-Path $paths.StateRoot ("agent-turn-{0:D2}.txt" -f [int]$n))) { Read-JarvisUtf8Text (Join-Path $paths.StateRoot ("agent-turn-{0:D2}.txt" -f [int]$n)) } else { '' })) }
     Show-Action "Step $n post-check passed"
     if (-not $DryRun) { Save-JarvisProgress -Path $progressPath -Completed (@($progress.completed) + @($n)) -Current ($n + 1); $progress = Get-JarvisProgress $progressPath }
