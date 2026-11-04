@@ -299,6 +299,11 @@ class Handler(BaseHTTPRequestHandler):
     server_version = "JARVIS/0.1"
     def log_message(self, fmt, *args):
         return
+    def handle(self):
+        try:
+            super().handle()
+        except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError):
+            self.close_connection = True
     def _target(self):
         return request_path(self.path)
     def _body(self) -> bytes:
@@ -331,7 +336,7 @@ class Handler(BaseHTTPRequestHandler):
                 while True:
                     data = json.dumps(state(), ensure_ascii=False).encode("utf-8")
                     self.wfile.write(b"event: state\ndata: " + data + b"\n\n"); self.wfile.flush(); time.sleep(3)
-            except (BrokenPipeError, ConnectionResetError): return
+            except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError): return
         if path == "/api/state": return json_response(self, state())
         if path == "/api/content": return json_response(self, shelves())
         if path == "/api/owner":

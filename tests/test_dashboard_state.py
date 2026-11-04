@@ -33,6 +33,30 @@ def server_paths(project: Path, hermes: Path):
 
 
 class DashboardStateTests(unittest.TestCase):
+    def test_request_reader_ignores_windows_client_disconnect(self):
+        class DisconnectedReader:
+            def readline(self, limit):
+                raise ConnectionAbortedError(10053, "connection aborted")
+
+        handler = server.Handler.__new__(server.Handler)
+        handler.rfile = DisconnectedReader()
+
+        handler.handle()
+
+    def test_event_stream_ignores_windows_client_disconnect(self):
+        class DisconnectedStream:
+            def write(self, data):
+                raise ConnectionAbortedError(10053, "connection aborted")
+
+        handler = server.Handler.__new__(server.Handler)
+        handler.path = "/events"
+        handler.wfile = DisconnectedStream()
+        handler.send_response = lambda status: None
+        handler.send_header = lambda name, value: None
+        handler.end_headers = lambda: None
+
+        handler.do_GET()
+
     def test_state_reads_real_activity_gateway_and_persisted_version(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -1,5 +1,6 @@
 import http.client
 import importlib.util
+import re
 import shutil
 import tempfile
 import threading
@@ -95,6 +96,44 @@ class DashboardStaticTests(unittest.TestCase):
                         self.assertEqual(status, 400)
                 status, _, _ = get(port, "/" + "a" * server.MAX_REQUEST_TARGET_BYTES)
                 self.assertEqual(status, 414)
+
+    def test_conversation_surfaces_audio_and_interim_transcription_state(self):
+        script = (DASHBOARD / "script.js").read_text(encoding="utf-8")
+        styles = (DASHBOARD / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn("recognition.onaudiostart", script)
+        self.assertIn("recognition.onspeechstart", script)
+        self.assertIn("recognition.onerror", script)
+        self.assertIn("interimTranscript", script)
+        self.assertIn("conversation.interrupt(); renderTranscript(); setPhase('READY');", script)
+        self.assertIn(".orb.is-listening", styles)
+
+    def test_space_hold_ignores_key_repeat_and_suppresses_keyboard_click(self):
+        script = (DASHBOARD / "script.js").read_text(encoding="utf-8")
+
+        self.assertIn("event.repeat", script)
+        self.assertIn("__jarvisSpaceHeld", script)
+        self.assertIn("__jarvisSuppressSpaceClick", script)
+
+    def test_conversation_has_stable_modes_and_cancellable_reply(self):
+        script = (DASHBOARD / "script.js").read_text(encoding="utf-8")
+        page = (DASHBOARD / "index.html").read_text(encoding="utf-8")
+
+        self.assertIn("toggleTalkMode", script)
+        self.assertIn("Talk mode", page)
+        self.assertIn("AbortController", script)
+        self.assertIn("cancel-reply", page)
+        self.assertIn("recognition.start()", script)
+        self.assertIn("RECONNECTING", script)
+
+    def test_talk_control_is_a_single_toggle_and_space_stops_explicitly(self):
+        script = (DASHBOARD / "script.js").read_text(encoding="utf-8")
+        page = (DASHBOARD / "index.html").read_text(encoding="utf-8")
+
+        self.assertIn("Toggle: Push to Talk", page)
+        self.assertIn("toggleTalkMode", script)
+        self.assertIn("if (conversation?.phase === 'listening') stopSpeechTurn();", script)
+        self.assertRegex(script, re.compile(r"document\.addEventListener\('keyup'.*?if \(conversation\?\.phase === 'listening'\) stopSpeechTurn\(\);", re.S))
 
 
 if __name__ == "__main__":
