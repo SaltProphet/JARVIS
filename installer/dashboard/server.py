@@ -9,6 +9,7 @@ import mimetypes
 import os
 import re
 import shutil
+import shlex
 import sqlite3
 import subprocess
 import sys
@@ -16,6 +17,7 @@ import tempfile
 import threading
 import time
 import urllib.request
+import urllib.error
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -44,6 +46,7 @@ UPLOAD_TYPES = {
 UPLOAD_LOCK = threading.Lock()
 STT_LOCK = threading.Lock()
 STT_MODEL = None
+SERVICE_PROCESSES: dict[str, subprocess.Popen] = {}
 CREW = [
     {"key": "default", "name": "JARVIS", "code": "J-00", "initials": "JV", "role": "Chief of staff", "tagline": "Routes, verifies, reports"},
     {"key": "dev", "name": "DEV", "code": "J-01", "initials": "DV", "role": "Build engineer", "tagline": "Makes the machine useful"},
@@ -139,6 +142,84 @@ def gateway_state() -> dict:
     except (OSError, ValueError, UnicodeError):
         pass
     return result
+
+
+def kokoro_state() -> dict:
+    try:
+        with urllib.request.urlopen("http://127.0.0.1:8767/health", timeout=1) as response:
+            if response.status == 200:
+                return {"state": "running", "endpoint": "http://127.0.0.1:8767"}
+    except (OSError, urllib.error.URLError):
+        pass
+    return {"state": "stopped", "endpoint": "http://127.0.0.1:8767"}
+
+
+def stt_state() -> dict:
+    model = os.environ.get("JARVIS_STT_MODEL", "base")
+    try:
+        import faster_whisper  # noqa: F401
+    except ImportError:
+        return {"state": "error", "detail": "faster-whisper is not installed", "model": model}
+    return {"state": "ready", "detail": f"local {os.environ.get('JARVIS_STT_DEVICE', 'cpu')} {os.environ.get('JARVIS_STT_COMPUTE_TYPE', 'int8')}", "model": model}
+
+
+def service_status() -> dict:
+    gateway = gateway_state()
+    kokoro = kokoro_state()
+    stt = stt_state()
+    return {
+        "dashboard": {"id": "dashboard", "label": "Dashboard", "state": "available", "detail": f"127.0.0.1:{PORT}", "actions": []},
+        "stt": {"id": "stt", "label": "Whisper", "state": stt["state"], "detail": stt["detail"], "actions": []},
+        "hermes": {"id": "hermes", "label": "Hermes", "state": "running" if gateway["state"] == "running" else "stopped", "detail": ", ".join(gateway["platforms"]) or "gateway", "actions": ["start", "restart"]},
+        "kokoro": {"id": "kokoro", "label": "Kokoro", "state": kokoro["state"], "detail": kokoro["endpoint"], "actions": ["start", "stop", "restart"]},
+    }
+
+
+def audio_devices() -> dict:
+    result = {"inputs": [], "outputs": [], "default_input": None, "default_output": None, "error": None}
+    try:
+        import sounddevice as sd
+        devices = sd.query_devices()
+        defaults = sd.default.device
+        for index, device in enumerate(devices):
+            item = {"id": str(index), "name": str(device.get("name", f"Device {index}")), "channels": int(device.get("max_input_channels", 0) or 0)}
+            if item["channels"] > 0:
+                result["inputs"].append(item)
+            if int(device.get("max_output_channels", 0) or 0) > 0:
+                result["outputs"].append({**item, "channels": int(device.get("max_output_channels", 0) or 0)})
+        if isinstance(defaults, (tuple, list)):
+            if len(defaults) > 0 and defaults[0] is not None:
+                result["default_input"] = str(defaults[0])
+            if len(defaults) > 1 and defaults[1] is not None:
+                result["default_output"] = str(defaults[1])
+    except Exception as exc:
+        result["error"] = str(exc)
+    return result
+
+
+def service_action(service: str, action: str) -> dict:
+    if service not in {"hermes", "kokoro"}:
+        raise RequestError("service action is not available", 404)
+    if action not in {"start", "stop", "restart"}:
+        raise RequestError("unknown service action")
+    process = SERVICE_PROCESSES.get(service)
+    if action in {"stop", "restart"} and process and process.poll() is None:
+        process.terminate()
+        try:
+            process.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            process.kill()
+    SERVICE_PROCESSES.pop(service, None)
+    if action in {"start", "restart"}:
+        if service == "kokoro":
+            script = ROOT / "voice" / "voice-server.py"
+            command = [sys.executable, str(script)] if script.is_file() else shlex.split(os.environ.get("JARVIS_KOKORO_COMMAND", ""))
+        else:
+            command = shlex.split(os.environ.get("JARVIS_HERMES_GATEWAY_COMMAND", "hermes gateway run --quiet"))
+        if not command:
+            raise RequestError(f"no {service} start command configured", 409)
+        SERVICE_PROCESSES[service] = subprocess.Popen(command, cwd=str(ROOT), env={**os.environ, "HERMES_HOME": str(HERMES)}, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return {"ok": True, "service": service, "action": action, "services": service_status()}
 
 
 def box_state() -> dict:
@@ -360,8 +441,9 @@ class Handler(BaseHTTPRequestHandler):
             raise RequestError("incomplete request body")
         return body
     def _request_error(self, exc: RequestError):
+        result = json_response(self, {"ok": False, "error": str(exc)}, exc.status)
         self.close_connection = True
-        return json_response(self, {"ok": False, "error": str(exc)}, exc.status)
+        return result
     def do_GET(self):
         try:
             path, query = self._target()
@@ -376,6 +458,8 @@ class Handler(BaseHTTPRequestHandler):
                     self.wfile.write(b"event: state\ndata: " + data + b"\n\n"); self.wfile.flush(); time.sleep(3)
             except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError): return
         if path == "/api/state": return json_response(self, state())
+        if path == "/api/services": return json_response(self, {"services": list(service_status().values())})
+        if path == "/api/audio/devices": return json_response(self, audio_devices())
         if path == "/api/content": return json_response(self, shelves())
         if path == "/api/owner":
             user = HERMES / "memories" / "USER.md"; first = ""
@@ -462,6 +546,16 @@ class Handler(BaseHTTPRequestHandler):
                 result = subprocess.run(cmd, capture_output=True, text=True, timeout=300, env={**os.environ, "HERMES_HOME": str(HERMES)})
                 return json_response(self, result.stdout.strip() if result.returncode == 0 else result.stderr.strip(), 200 if result.returncode == 0 else 502, "text/plain; charset=utf-8")
             except Exception as exc: return json_response(self, {"error": str(exc)}, 502)
+        if path.startswith("/api/services/") and path.endswith("/action"):
+            service = path[len("/api/services/"):-len("/action")].strip("/")
+            try:
+                payload = json.loads(raw.decode("utf-8", "strict"))
+                action = payload.get("action") if isinstance(payload, dict) else None
+                return json_response(self, service_action(service, action))
+            except RequestError as exc:
+                return json_response(self, {"ok": False, "error": str(exc)}, exc.status)
+            except (ValueError, TypeError, json.JSONDecodeError) as exc:
+                return json_response(self, {"ok": False, "error": "invalid service action"}, 400)
         if path == "/api/models/set":
             try:
                 payload = json.loads(raw); agent = payload["agent"]; model = payload["model"]; provider = payload["provider"]

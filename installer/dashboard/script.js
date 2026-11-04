@@ -1,291 +1,57 @@
-/* JARVIS dashboard client: one conversation owner, no stale callbacks. */
-const conversation = typeof ConversationState === 'function' ? new ConversationState() : null;
+const conversation = new ConversationState();
 const selected = { key: 'default' };
-const talk = { mode: 'ptt', captureActive: false, stopRequested: false };
+const talk = { mode: 'ptt', captureActive: false, stopRequested: false, startedAt: 0, spokenReplies: true };
+let serviceCache = [];
 
-function escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-}
-
+function escapeHtml(value) { return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch])); }
+function $ (id) { return document.getElementById(id); }
+function setPhase(label) { $('conversation-status').textContent = label; $('orb').classList.toggle('is-listening', talk.captureActive); }
+function setTranscript(text) { $('transcript').textContent = text || 'Waiting for speech.'; }
+function addMessage(kind, text) { if (!text) return; $('empty-thread')?.remove(); const item = document.createElement('div'); item.className = `message ${kind}`; item.innerHTML = `<small>${kind === 'user' ? 'YOU' : 'ASSISTANT'}</small>${escapeHtml(text)}`; $('conversation-thread').appendChild(item); $('conversation-thread').scrollTop = $('conversation-thread').scrollHeight; }
+function updateTimer() { if (!talk.captureActive) return; const seconds = Math.floor((Date.now() - talk.startedAt) / 1000); $('timer').textContent = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`; window.setTimeout(updateTimer, 250); }
 function render(state) {
+  $('gateway').textContent = state.gateway?.state?.toUpperCase() || 'UNKNOWN';
   document.querySelector('[data-version]').textContent = state.version || '—';
-  document.getElementById('gateway').textContent = state.gateway?.state || 'UNKNOWN';
-  document.getElementById('tasks').textContent = state.crew.reduce((n, agent) => n + (agent.tasks || 0), 0);
-   document.getElementById('crew').innerHTML = state.crew.map((agent, index) => `<button class="face" data-agent="${escapeHtml(agent.key)}" title="${escapeHtml(agent.role)}"><kbd>${index + 1}</kbd> ${escapeHtml(AV(agent.key))} ${escapeHtml(agent.name)}</button>`).join('');
-  document.getElementById('agent-list').innerHTML = state.crew.map(agent => `<p><b>${escapeHtml(agent.name)}</b> · ${escapeHtml(agent.role)} · ${agent.tasks || 0} logged tasks</p>`).join('');
-  document.getElementById('feed').innerHTML = (state.ops || []).slice(0, 6).map(op => `<div>${escapeHtml(op.agent)}: ${escapeHtml(op.op)}</div>`).join('') || '<div>No activity yet.</div>';
-  document.querySelectorAll('[data-agent]').forEach(button => { button.onclick = () => selectAgent(button.dataset.agent); });
+  $('tasks').textContent = state.crew.reduce((total, agent) => total + (agent.tasks || 0), 0);
+  $('feed').innerHTML = (state.ops || []).slice(0, 6).map(op => `<div class="activity-item"><span><b>${escapeHtml(op.agent || 'system')}</b> ${escapeHtml(op.op)}</span><span>${escapeHtml(op.t || '')}</span></div>`).join('') || '<span class="muted">No activity yet.</span>';
+  $('agent-list').innerHTML = state.crew.map(agent => `<button class="agent-card card ${agent.key === selected.key ? 'selected' : ''}" data-agent="${escapeHtml(agent.key)}"><span><b>${escapeHtml(agent.name)}</b><small class="service-detail">${escapeHtml(agent.role)}</small></span><span>${agent.tasks || 0} tasks</span></button>`).join('');
+  document.querySelectorAll('[data-agent]').forEach(button => button.addEventListener('click', () => selectAgent(button.dataset.agent)));
 }
+function selectAgent(agent) { selected.key = agent; const label = document.querySelector(`[data-agent="${CSS.escape(agent)}"] b`); $('active-agent').textContent = label?.textContent || agent; document.querySelectorAll('[data-agent]').forEach(button => button.classList.toggle('selected', button.dataset.agent === agent)); }
 
-function selectAgent(agent) {
-  selected.key = agent;
-  if (conversation) conversation.selectedAgent = agent;
-  document.querySelectorAll('[data-agent]').forEach(button => button.classList.toggle('selected', button.dataset.agent === agent));
+function renderServices(services) {
+  serviceCache = services;
+  const html = services.map(service => { const action = service.actions?.[0]; return `<div class="service"><span class="service-dot ${escapeHtml(service.state)}"></span><span class="service-name">${escapeHtml(service.label)}<small class="service-detail">${escapeHtml(service.detail || service.state)}</small></span>${action ? `<button class="service-action" data-service="${escapeHtml(service.id)}" data-action="${escapeHtml(action)}">${escapeHtml(action)}</button>` : ''}</div>`; }).join('');
+  $('services').innerHTML = html || '<p class="muted">No service data.</p>';
+  $('drawer-services').innerHTML = html || '<p class="muted">No service data.</p>';
+  document.querySelectorAll('[data-service]').forEach(button => button.addEventListener('click', () => serviceAction(button.dataset.service, button.dataset.action)));
 }
+async function refreshServices() { try { const response = await fetch('/api/services'); const payload = await response.json(); if (!response.ok) throw new Error(payload.error || 'service status unavailable'); renderServices(payload.services || []); } catch (error) { $('services').innerHTML = `<p class="error-text">${escapeHtml(error.message)}</p>`; } }
+async function serviceAction(service, action) { $('settings-error').textContent = `Requesting ${action} for ${service}...`; try { const response = await fetch(`/api/services/${encodeURIComponent(service)}/action`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) }); const payload = await response.json(); if (!response.ok || !payload.ok) throw new Error(payload.error || 'service action failed'); renderServices(Object.values(payload.services)); $('settings-error').textContent = ''; } catch (error) { $('settings-error').textContent = error.message; } }
+async function loadAudioDevices() { try { const response = await fetch('/api/audio/devices'); const payload = await response.json(); const input = $('input-device'); const output = $('output-device'); input.innerHTML = (payload.inputs || []).map(device => `<option value="${escapeHtml(device.id)}">${escapeHtml(device.name)}</option>`).join('') || '<option>No microphones found</option>'; output.innerHTML = (payload.outputs || []).map(device => `<option value="${escapeHtml(device.id)}">${escapeHtml(device.name)}</option>`).join('') || '<option>No outputs found</option>'; if (payload.default_input) input.value = payload.default_input; if (payload.default_output) output.value = payload.default_output; $('input-name').textContent = input.selectedOptions[0]?.textContent || 'No microphone'; if (payload.error) $('settings-error').textContent = payload.error; } catch (error) { $('settings-error').textContent = error.message; } }
 
-function setPhase(label) {
-  let status = document.getElementById('conversation-status');
-  if (!status) {
-    status = document.createElement('div');
-    status.id = 'conversation-status';
-    status.className = 'conversation-status';
-    document.getElementById('orb').after(status);
-  }
-   const orb = document.getElementById('orb');
-   if (orb) {
-     orb.dataset.phase = label;
-     orb.classList.toggle('is-listening', talk.captureActive);
-   }
-   status.textContent = label;
-   const overlayStatus = document.querySelector('#conversation-overlay .eyebrow');
-   if (overlayStatus) overlayStatus.textContent = `Live transcript · ${label}`;
-   const cancel = document.getElementById('cancel-reply');
-   if (cancel) cancel.hidden = label !== 'WAITING FOR REPLY';
+function stopRecognition() { const recognition = window.__missionRecognition; window.__missionRecognition = null; if (!recognition) return; talk.captureActive = false; recognition.onresult = recognition.onend = recognition.onerror = null; recognition.stop(); }
+function stopMediaCapture() { talk.captureActive = false; const recorder = window.__missionRecorder; window.__missionRecorder = null; if (recorder && recorder.state !== 'inactive') recorder.stop(); if (window.__missionStream) { window.__missionStream.getTracks().forEach(track => track.stop()); window.__missionStream = null; } }
+function finishSpeechTurn(generation) { if (!conversation.finishPushToTalk(generation)) { setPhase('READY'); return; } const text = conversation.transcript; addMessage('user', text); setTranscript(text); setPhase('WAITING FOR REPLY'); const controller = new AbortController(); window.__missionReply = controller; sendMessage(text, selected.key, controller.signal).then(reply => { if (window.__missionReply !== controller) return; window.__missionReply = null; addMessage('assistant', reply); $('reply').textContent = reply; conversation.beginSpeaking(); setPhase('REPLY'); if (talk.spokenReplies) speakReply(reply).catch(error => $('settings-error').textContent = error.message); window.setTimeout(() => { conversation.interrupt(); setTranscript('Waiting for speech.'); setPhase('READY'); }, 1100); }).catch(error => { if (error.name === 'AbortError') return; $('reply').textContent = error.message; setPhase('ERROR'); conversation.interrupt(); }); }
+async function startMediaCapture(generation) { try { const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); if (generation !== conversation.dictationGeneration || talk.stopRequested) return stream.getTracks().forEach(track => track.stop()); const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm'; const recorder = new MediaRecorder(stream, { mimeType }); const chunks = []; window.__missionStream = stream; window.__missionRecorder = recorder; recorder.ondataavailable = event => { if (event.data.size) chunks.push(event.data); }; recorder.onerror = () => { stopMediaCapture(); conversation.interrupt(); setPhase('MIC ERROR'); }; recorder.onstop = async () => { stream.getTracks().forEach(track => track.stop()); window.__missionStream = null; if (!chunks.length || generation !== conversation.dictationGeneration) return; try { setPhase('TRANSCRIBING'); const response = await fetch('/api/transcribe', { method: 'POST', headers: { 'Content-Type': mimeType }, body: new Blob(chunks, { type: mimeType }) }); const payload = await response.json(); if (!response.ok) throw new Error(payload.error || 'transcription failed'); conversation.acceptDictation(generation, payload.text); setTranscript(conversation.transcript); finishSpeechTurn(generation); } catch (error) { conversation.interrupt(); setPhase(`TRANSCRIPTION ERROR: ${error.message}`); } }; recorder.start(); } catch (error) { conversation.interrupt(); setPhase(`MIC ERROR: ${error.name || 'permission denied'}`); } }
+function startRecognition(generation, transcriptOnly = false) { const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition; if (!Recognition) { setPhase('TRANSCRIPTION UNAVAILABLE'); return; } const recognition = new Recognition(); recognition.continuous = true; recognition.interimResults = true; recognition.onresult = event => { let interim = ''; for (let index = event.resultIndex; index < event.results.length; index += 1) { const text = event.results[index][0].transcript; if (event.results[index].isFinal) { conversation.acceptDictation(generation, text); if (transcriptOnly) { setTranscript(conversation.transcript); } } else interim += text; } setTranscript([conversation.transcript, interim].filter(Boolean).join(' ')); }; recognition.onerror = event => setPhase(`MIC ERROR: ${event.error || 'unknown'}`); recognition.onend = () => { if (transcriptOnly && talk.mode === 'always' && !talk.stopRequested) { try { recognition.start(); } catch (_) {} } }; window.__missionRecognition = recognition; try { recognition.start(); } catch (error) { setPhase(`MIC ERROR: ${error.name || 'start failed'}`); } }
+function beginSpeechTurn() { const generation = conversation.startPushToTalk(selected.key); if (generation === null) return; talk.captureActive = true; talk.stopRequested = false; talk.startedAt = Date.now(); setTranscript('Listening...'); setPhase('LISTENING'); updateTimer(); if (navigator.mediaDevices?.getUserMedia && window.MediaRecorder) startMediaCapture(generation); else startRecognition(generation); }
+function stopSpeechTurn() { talk.stopRequested = true; if (window.__missionRecorder) { setPhase('TRANSCRIBING'); stopMediaCapture(); return; } stopRecognition(); finishSpeechTurn(conversation.dictationGeneration); }
+function startAlwaysOn() { talk.stopRequested = false; talk.captureActive = true; talk.startedAt = Date.now(); conversation.beginListening(selected.key); conversation.transcript = ''; setPhase('ALWAYS ON'); setTranscript('Transcript-only listening enabled.'); window.setTimeout(() => { if (talk.mode === 'always' && talk.captureActive && !talk.stopRequested) startRecognition(conversation.dictationGeneration, true); }, 0); }
+function stopCapture() { talk.stopRequested = true; stopMediaCapture(); stopRecognition(); talk.captureActive = false; conversation.interrupt(); setTranscript('Waiting for speech.'); setPhase('READY'); }
+function setMode(mode) { if (talk.captureActive) stopCapture(); talk.mode = mode; document.querySelectorAll('[data-mode]').forEach(button => button.classList.toggle('active', button.dataset.mode === mode)); $('capture-hint').textContent = mode === 'ptt' ? 'Hold Space to speak' : mode === 'tap' ? 'Click to toggle' : 'Transcript only'; if (mode === 'always') startAlwaysOn(); }
+async function sendMessage(text, agent = selected.key, signal) { const response = await fetch('/api/chat/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent, text }), signal }); const reply = await response.text(); if (!response.ok) throw new Error(reply || 'chat request failed'); return reply; }
+async function speakReply(text) { if (window.__missionAudio) window.__missionAudio.pause(); const response = await fetch('/api/voice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) }); if (!response.ok) throw new Error('voice service unavailable'); const url = URL.createObjectURL(await response.blob()); const audio = new Audio(url); window.__missionAudio = audio; audio.volume = Number($('volume').value) / 100; audio.onended = () => { URL.revokeObjectURL(url); window.__missionAudio = null; }; await audio.play(); }
+
+function openDrawer() { $('drawer-backdrop').hidden = false; $('settings-drawer').classList.add('open'); $('settings-drawer').setAttribute('aria-hidden', 'false'); loadAudioDevices(); refreshServices(); }
+function closeDrawer() { $('settings-drawer').classList.remove('open'); $('settings-drawer').setAttribute('aria-hidden', 'true'); window.setTimeout(() => { $('drawer-backdrop').hidden = true; }, 200); }
+function installControls() {
+  document.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => { const view = button.dataset.view; document.querySelectorAll('.view').forEach(item => item.classList.toggle('active', item.id === view)); document.querySelectorAll('.rail-link').forEach(item => item.classList.toggle('active', item.dataset.view === view)); }));
+  document.querySelectorAll('[data-drawer]').forEach(button => button.addEventListener('click', openDrawer)); document.querySelector('[data-close-drawer]').addEventListener('click', closeDrawer); $('drawer-backdrop').addEventListener('click', closeDrawer);
+  document.querySelectorAll('[data-mode]').forEach(button => button.addEventListener('click', () => setMode(button.dataset.mode))); $('orb').addEventListener('click', () => { if (talk.mode === 'always') return; talk.captureActive ? stopSpeechTurn() : beginSpeechTurn(); });
+  $('cancel-reply').addEventListener('click', () => { window.__missionReply?.abort(); stopCapture(); $('reply').textContent = 'Reply cancelled.'; }); $('spoken-replies').addEventListener('change', event => { talk.spokenReplies = event.target.checked; $('output-state').textContent = talk.spokenReplies ? 'Spoken + text' : 'Text only'; }); $('volume').addEventListener('input', event => $('volume-value').textContent = `${event.target.value}%`); $('input-device').addEventListener('change', event => $('input-name').textContent = event.target.selectedOptions[0]?.textContent || 'Default microphone');
+  $('send').addEventListener('click', async () => { const text = $('message').value.trim(); if (!text) return; $('message').value = ''; addMessage('user', text); try { const reply = await sendMessage(text); $('reply').textContent = reply; addMessage('assistant', reply); if (talk.spokenReplies) await speakReply(reply); } catch (error) { $('reply').textContent = error.message; } });
+  document.addEventListener('keydown', event => { if (event.code === 'Space' && !event.repeat && !ConversationState.isTextControl(event.target) && talk.mode === 'ptt') { event.preventDefault(); beginSpeechTurn(); } if (event.key === 'Escape') stopCapture(); }); document.addEventListener('keyup', event => { if (event.code === 'Space' && talk.mode === 'ptt') { event.preventDefault(); if (talk.captureActive) stopSpeechTurn(); } });
 }
-
-function setActivity(label) {
-  const status = document.getElementById('conversation-status');
-  const overlayStatus = document.querySelector('#conversation-overlay .eyebrow');
-  const value = `${talk.mode.toUpperCase()} · ${label}`;
-  if (status) status.textContent = value;
-  if (overlayStatus) overlayStatus.textContent = `Live transcript · ${value}`;
-  const orb = document.getElementById('orb');
-  if (orb) {
-    orb.dataset.activity = label;
-    orb.classList.toggle('is-listening', talk.captureActive);
-  }
-}
-
-function renderTranscript(interimTranscript = '') {
-  const target = document.getElementById('conversation-transcript');
-  if (target && conversation) target.textContent = [conversation.transcript, interimTranscript.trim()].filter(Boolean).join(' ') || 'Waiting for speech.';
-}
-
-function stopRecognition() {
-  const recognition = window.__jarvisRecognition;
-  window.__jarvisRecognition = null;
-  if (!recognition) return;
-  talk.captureActive = false;
-  recognition.onresult = null;
-  recognition.onend = null;
-  recognition.onerror = null;
-  recognition.onstart = null;
-  recognition.onaudiostart = null;
-  recognition.onspeechstart = null;
-  recognition.onspeechend = null;
-  recognition.stop();
-}
-
-function stopMediaCapture() {
-  talk.captureActive = false;
-  const recorder = window.__jarvisMediaRecorder;
-  window.__jarvisMediaRecorder = null;
-  if (recorder && recorder.state !== 'inactive') recorder.stop();
-  if (window.__jarvisMediaStream) {
-    window.__jarvisMediaStream.getTracks().forEach(track => track.stop());
-    window.__jarvisMediaStream = null;
-  }
-}
-
-async function startMediaCapture(generation) {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    if (generation !== conversation.dictationGeneration || talk.stopRequested) {
-      stream.getTracks().forEach(track => track.stop());
-      return;
-    }
-    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
-    const recorder = new MediaRecorder(stream, { mimeType });
-    const chunks = [];
-    window.__jarvisMediaStream = stream;
-    window.__jarvisMediaRecorder = recorder;
-    recorder.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
-    recorder.onerror = () => { stopMediaCapture(); conversation.interrupt(); renderTranscript(); setPhase('MIC ERROR'); };
-    recorder.onstart = () => setActivity('AUDIO');
-    recorder.onstop = async () => {
-      if (window.__jarvisMediaRecorder === recorder) window.__jarvisMediaRecorder = null;
-      stream.getTracks().forEach(track => track.stop());
-      window.__jarvisMediaStream = null;
-      if (!chunks.length || generation !== conversation.dictationGeneration) return;
-      try {
-        setPhase('TRANSCRIBING');
-        const response = await fetch('/api/transcribe', { method: 'POST', headers: { 'Content-Type': mimeType }, body: new Blob(chunks, { type: mimeType }) });
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || 'transcription failed');
-        conversation.acceptDictation(generation, payload.text);
-        renderTranscript();
-        finishSpeechTurn(generation);
-      } catch (error) {
-        conversation.interrupt();
-        renderTranscript();
-        setPhase(`TRANSCRIPTION ERROR: ${error.message}`);
-      }
-    };
-    recorder.start();
-    if (talk.stopRequested) stopMediaCapture();
-  } catch (error) {
-    conversation.interrupt();
-    renderTranscript();
-    setPhase(`MIC ERROR: ${error.name || 'permission denied'}`);
-  }
-}
-
-async function sendMessage(text, agent = selected.key, signal) {
-  const response = await fetch('/api/chat/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent, text }), signal });
-  const reply = await response.text();
-  if (!response.ok) throw new Error(reply || 'chat request failed');
-  return reply;
-}
-
-async function speakReply(text) {
-  if (window.__jarvisAudio) window.__jarvisAudio.pause();
-  const response = await fetch('/api/voice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
-  if (!response.ok) throw new Error('voice request failed');
-  const url = URL.createObjectURL(await response.blob());
-  const audio = new Audio(url);
-  window.__jarvisAudio = audio;
-  audio.onended = () => { URL.revokeObjectURL(url); if (window.__jarvisAudio === audio) window.__jarvisAudio = null; };
-  await audio.play();
-}
-
-function beginSpeechTurn() {
-  if (!conversation) return;
-  if (window.__jarvisRestTimer) { clearTimeout(window.__jarvisRestTimer); window.__jarvisRestTimer = null; }
-  const generation = conversation.startPushToTalk(selected.key);
-  if (generation === null) return;
-  talk.captureActive = true;
-  talk.stopRequested = false;
-  renderTranscript();
-  setPhase('LISTENING');
-  if (navigator.mediaDevices?.getUserMedia && window.MediaRecorder) {
-    startMediaCapture(generation);
-    return;
-  }
-  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!Recognition) {
-    conversation.interrupt();
-    renderTranscript();
-    setPhase('TRANSCRIPTION UNAVAILABLE');
-    return;
-  }
-  const recognition = new Recognition();
-  recognition.continuous = true;
-  recognition.interimResults = true;
-  let interimTranscript = '';
-  recognition.onstart = () => { if (generation === conversation.dictationGeneration) setActivity('LISTENING'); };
-  recognition.onaudiostart = () => { if (generation === conversation.dictationGeneration) setActivity('AUDIO'); };
-  recognition.onspeechstart = () => { if (generation === conversation.dictationGeneration) setActivity('VOICE'); };
-  recognition.onspeechend = () => { if (generation === conversation.dictationGeneration) setActivity('AUDIO WAITING'); };
-  recognition.onresult = event => {
-    interimTranscript = '';
-    for (let index = event.resultIndex; index < event.results.length; index += 1) {
-      const transcript = event.results[index][0].transcript;
-      if (event.results[index].isFinal) conversation.acceptDictation(generation, transcript);
-      else interimTranscript += transcript;
-    }
-    renderTranscript(interimTranscript);
-  };
-   recognition.onerror = event => {
-     if (generation !== conversation.dictationGeneration) return;
-     if (event.error === 'no-speech') return setActivity('AUDIO WAITING');
-     talk.stopRequested = true;
-     stopRecognition();
-     setPhase(`MIC ERROR: ${event.error || 'unknown'}`);
-   };
-   recognition.onend = () => {
-     if (generation !== conversation.dictationGeneration || talk.stopRequested || conversation.phase !== 'listening') return;
-     setActivity('RECONNECTING');
-     setTimeout(() => {
-       if (generation !== conversation.dictationGeneration || talk.stopRequested || conversation.phase !== 'listening') return;
-       try { recognition.start(); } catch (error) { if (error.name !== 'InvalidStateError') setActivity('RECONNECT FAILED'); }
-     }, 0);
-   };
-  window.__jarvisRecognition = recognition;
-   try { recognition.start(); } catch (error) { if (generation === conversation.dictationGeneration) { talk.stopRequested = true; conversation.interrupt(); renderTranscript(); setPhase(`MIC ERROR: ${error.name || 'start failed'}`); } return; }
-}
-
-function finishSpeechTurn(generation) {
-  if (!conversation || !conversation.finishPushToTalk(generation)) {
-    if (conversation) { conversation.interrupt(); renderTranscript(); setPhase('READY'); }
-    return;
-  }
-  setPhase('WAITING FOR REPLY');
-  const text = conversation.transcript;
-  const controller = new AbortController();
-  window.__jarvisReplyController = controller;
-  sendMessage(text, selected.key, controller.signal).then(reply => { if (window.__jarvisReplyController !== controller) return; window.__jarvisReplyController = null; document.getElementById('reply').textContent = reply; conversation.beginSpeaking(); setPhase('REPLY'); speakReply(reply).catch(error => setPhase(`VOICE ERROR: ${error.message}`)); window.__jarvisRestTimer = setTimeout(() => { conversation.interrupt(); renderTranscript(); }, REST_MS); }).catch(error => { if (error.name === 'AbortError' || window.__jarvisReplyController !== controller) return; window.__jarvisReplyController = null; document.getElementById('reply').textContent = error.message; conversation.interrupt(); renderTranscript(); setPhase('ERROR'); });
-}
-
-function stopSpeechTurn(generation = conversation?.dictationGeneration) {
-  if (window.__jarvisPushTimer) { clearTimeout(window.__jarvisPushTimer); window.__jarvisPushTimer = null; }
-  talk.stopRequested = true;
-  if (window.__jarvisMediaRecorder) {
-    setPhase('TRANSCRIBING');
-    stopMediaCapture();
-    return;
-  }
-  stopRecognition();
-  finishSpeechTurn(generation);
-}
-
-function cancelReply() {
-  if (window.__jarvisReplyController) { window.__jarvisReplyController.abort(); window.__jarvisReplyController = null; }
-  if (window.__jarvisAudio) { window.__jarvisAudio.pause(); window.__jarvisAudio = null; }
-  if (conversation?.phase === 'waiting-for-reply') conversation.interrupt();
-  const reply = document.getElementById('reply');
-  if (reply) reply.textContent = 'Reply cancelled.';
-  renderTranscript();
-  setPhase('READY');
-}
-
-function toggleTalkMode() {
-  talk.mode = talk.mode === 'ptt' ? 'htt' : 'ptt';
-  document.getElementById('talk-mode-toggle')?.setAttribute('aria-pressed', String(talk.mode === 'ptt'));
-}
-
-function installConversationControls() {
-  const orb = document.getElementById('orb');
-  if (!orb) return;
-  const pause = document.getElementById('dictation-pause');
-  document.getElementById('cancel-reply')?.addEventListener('click', cancelReply);
-  document.getElementById('talk-mode-toggle')?.addEventListener('click', toggleTalkMode);
-  if (pause) pause.onclick = () => { if (conversation?.dictationPaused) { conversation.resumeDictation(); pause.textContent = 'Pause dictation'; } else if (conversation?.pauseDictation()) pause.textContent = 'Resume dictation'; };
-  orb.setAttribute('role', 'button');
-  orb.tabIndex = 0;
-  orb.onclick = () => {
-    if (window.__jarvisSuppressSpaceClick) { window.__jarvisSuppressSpaceClick = false; return; }
-    conversation?.phase === 'listening' ? stopSpeechTurn() : beginSpeechTurn();
-  };
-  document.addEventListener('keydown', event => {
-     if (event.key === 'Escape') { if (window.__jarvisPushTimer) clearTimeout(window.__jarvisPushTimer); if (window.__jarvisRestTimer) clearTimeout(window.__jarvisRestTimer); talk.stopRequested = true; stopRecognition(); cancelReply(); return; }
-    if (event.code === 'Space' && !ConversationState.isTextControl(event.target)) {
-      event.preventDefault();
-      if (event.repeat || window.__jarvisSpaceHeld) return;
-      window.__jarvisSpaceHeld = true;
-      if (conversation?.phase === 'rest') beginSpeechTurn();
-    }
-    if (/^[1-4]$/.test(event.key) && !event.ctrlKey && !event.metaKey && !ConversationState.isTextControl(event.target)) selectAgent(['default', 'dev', 'research', 'assistant'][Number(event.key) - 1]);
-  });
-  document.addEventListener('keyup', event => {
-    if (event.code !== 'Space') return;
-    event.preventDefault();
-    if (!window.__jarvisSpaceHeld) return;
-    window.__jarvisSpaceHeld = false;
-    window.__jarvisSuppressSpaceClick = true;
-    if (conversation?.phase === 'listening') stopSpeechTurn();
-  });
-}
-
-async function load() {
-  const state = await fetch('/api/state').then(response => response.json());
-   render(state); installConversationControls();
-   fetch('/api/owner').then(response => response.json()).then(owner => { const greeting = document.getElementById('owner-greeting'); if (greeting && owner.name) greeting.textContent = ` · HELLO ${owner.name.toUpperCase()}`; });
-  const events = typeof EventSource === 'function' ? new EventSource('/events') : null;
-  if (events) events.addEventListener('state', event => render(JSON.parse(event.data)));
-  fetch('/api/content').then(response => response.json()).then(value => { document.getElementById('library-list').textContent = `${value.total} documents across four shelves.`; });
-  fetch('/docs.md').then(response => response.ok ? response.text() : Promise.reject()).then(value => { document.getElementById('docs-body').textContent = value; }).catch(() => { const seed = document.getElementById('docs-seed'); if (seed) document.getElementById('docs-body').textContent = seed.textContent; });
-}
-
-document.querySelectorAll('[data-view]').forEach(button => button.onclick = () => { document.querySelectorAll('.view').forEach(view => view.classList.remove('active')); document.getElementById(button.dataset.view).classList.add('active'); document.querySelectorAll('.tabs button').forEach(item => item.classList.remove('active')); button.classList.add('active'); });
-document.getElementById('send').onclick = async () => { const input = document.getElementById('message'); const text = input.value.trim(); if (!text) return; input.value = ''; try { document.getElementById('reply').textContent = await sendMessage(text); } catch (error) { document.getElementById('reply').textContent = error.message; } };
+async function load() { installControls(); try { render(await fetch('/api/state').then(response => response.json())); } catch (error) { $('settings-error').textContent = error.message; } refreshServices(); loadAudioDevices(); fetch('/api/content').then(response => response.json()).then(value => $('library-list').textContent = `${value.total} documents across four shelves.`).catch(() => {}); fetch('/api/cron').then(response => response.json()).then(value => $('schedule-list').textContent = value.jobs?.length ? `${value.jobs.length} scheduled jobs.` : 'No scheduled jobs yet.').catch(() => {}); fetch('/docs.md').then(response => response.ok ? response.text() : Promise.reject()).then(value => $('docs-body').textContent = value).catch(() => $('docs-body').textContent = 'Documentation is unavailable.'); }
 load();
