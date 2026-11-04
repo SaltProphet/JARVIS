@@ -147,7 +147,7 @@ function Test-JarvisStepPostCheck {
             if (-not (Test-Path -LiteralPath $conversation -PathType Leaf) -or -not (Test-Path -LiteralPath $script -PathType Leaf)) { return $false }
             $conversationText = [IO.File]::ReadAllText($conversation)
             $scriptText = [IO.File]::ReadAllText($script)
-            return $conversationText -match 'PUSH_TO_TALK_MS\s*=\s*5000' -and $conversationText -match 'startPushToTalk' -and $conversationText -match 'finishPushToTalk' -and $scriptText -match 'setTimeout\(\(\) => stopSpeechTurn' -and $scriptText -match 'acceptDictation\(generation'
+            return $conversationText -match 'PUSH_TO_TALK_MS\s*=\s*5000' -and $conversationText -match 'startPushToTalk' -and $conversationText -match 'finishPushToTalk' -and $scriptText -match 'pointerdown' -and $scriptText -match "event\.code === 'Space'" -and $scriptText -match 'acceptDictation\(generation'
         }
         33 {
             $dashboard = Join-Path $Root 'dashboard'
@@ -156,13 +156,13 @@ function Test-JarvisStepPostCheck {
             if (-not (Test-Path -LiteralPath $index -PathType Leaf) -or -not (Test-Path -LiteralPath $script -PathType Leaf)) { return $false }
             $indexText = [IO.File]::ReadAllText($index)
             $scriptText = [IO.File]::ReadAllText($script)
-            return $indexText -match 'conversation-overlay' -and $indexText -match 'conversation-transcript' -and $scriptText -match 'renderTranscript' -and $scriptText -match 'stopRecognition' -and $scriptText -match 'jarvisRestTimer'
+            return $indexText -match 'conversation-thread' -and $indexText -match 'transcript-line' -and $indexText -match 'stop-capture' -and $scriptText -match 'setTranscript' -and $scriptText -match 'stopRecognition' -and $scriptText -match 'cancelTurn'
         }
         34 {
             $dashboard = Join-Path $Root 'dashboard'
             $index = [IO.File]::ReadAllText((Join-Path $dashboard 'index.html'))
             $script = [IO.File]::ReadAllText((Join-Path $dashboard 'script.js'))
-            return $index -match 'owner-greeting' -and $script -match '/api/owner' -and $script -match '<kbd>' -and $script -match 'isTextControl'
+            return $index -match 'owner-greeting' -and $index -match '<kbd>' -and $script -match '/api/owner' -and $script -match 'isTextControl'
         }
         35 {
             $dashboard = Join-Path $Root 'dashboard'

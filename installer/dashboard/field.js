@@ -19,8 +19,10 @@ function createLayeredField() {
  }));
  function size(){const box=host.getBoundingClientRect();width=box.width;height=box.height;const ratio=Math.min(devicePixelRatio||1,2);canvas.width=width*ratio;canvas.height=height*ratio;ctx.setTransform(ratio,0,0,ratio,0,0);draw(0);}
  function draw(time){
-  const status=document.getElementById('conversation-status').textContent;
-  const active=talk.captureActive?0:status.includes('TRANSCRIB')?1:status.includes('WAITING')?2:status.includes('SPEAKING')?3:-1;
+  const statusNode=document.getElementById('conversation-status');
+  const status=statusNode.textContent;
+  const phase=statusNode.dataset.phase || status.toLowerCase();
+  const active=talk.captureActive?0:phase.includes('transcrib')?1:phase.includes('thinking')||phase.includes('waiting')?2:phase.includes('speaking')?3:-1;
   let level=0;if(meterAnalyser&&talk.captureActive){const data=new Uint8Array(meterAnalyser.fftSize);meterAnalyser.getByteTimeDomainData(data);level=Math.sqrt(data.reduce((sum,n)=>sum+((n-128)/128)**2,0)/data.length);}
   ctx.clearRect(0,0,width,height); const scale=Math.min(width/560,1),cx=width*.47;
   layers.forEach((layer,i)=>{
