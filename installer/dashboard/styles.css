@@ -15,3 +15,12 @@ main{width:100%;max-width:1250px;margin:0 auto;padding:30px 36px 40px;min-width:
 @media(max-width:700px){.topbar{margin-left:64px;height:60px;padding:0 16px}.brand{font-size:9px}.version{display:none}.app-shell{margin-left:64px;min-height:calc(100dvh - 60px)}.rail{width:64px;height:100dvh;padding:18px 5px 12px;display:flex;gap:7px}.rail-link{display:grid;place-items:center;justify-content:center;gap:5px;padding:9px 0;font-size:8px;min-height:45px}.rail-link span{font-size:16px}.rail-bottom{padding:12px 0 0}.rail-settings{justify-content:center;width:100%}.settings-label{display:none}.compact-services{display:grid;grid-template-columns:1fr 1fr;gap:1px;margin:4px 0 0}.service-indicator{width:26px;height:26px}main{padding:22px 14px 30px}.workspace-head{margin-bottom:18px}h1{font-size:22px}.voice-panel{height:310px}.orb-stage{height:250px}.orb{width:220px;height:220px}.orb-stage:before{width:245px;height:215px}.orb-stage:after{width:265px;height:230px}.mode-control{bottom:10px;right:8px}.mode-toggle{font-size:9px;gap:5px;padding:7px 4px;min-height:30px}.capture-status{bottom:12px;left:10px;right:115px;gap:7px}#conversation-status{position:absolute;bottom:32px;left:0;max-width:220px}.meter{width:38px;gap:2px}.capture-status .link-button{font-size:9px}.conversation-thread{padding:16px;max-height:320px}.message{max-width:94%;font-size:13px}.home-compose{padding:8px}.transcript-line{padding:10px 16px}.agent-grid{grid-template-columns:1fr}.compose-card{padding:16px}.service-list{padding:10px 0}.drawer{padding:22px 18px}.full-button{margin:0;width:100%}}
 @media(max-width:370px){.capture-status .meter{display:none}.capture-status{gap:6px;left:9px;right:107px}.capture-status #timer{font-size:9px}.mode-control{right:5px}}
 @media(prefers-reduced-motion:reduce){.orb.is-listening{animation:none}.drawer{transition:none}}
+
+/* Layered Field system visualization */
+.orb{width:min(100%,430px);height:290px;cursor:pointer}
+.orb svg{display:none}
+.orb canvas{display:block;width:100%;height:100%}
+.orb:hover canvas{filter:drop-shadow(0 0 10px #c8794844)}
+.orb.is-listening{animation:pulse 2.4s ease-in-out infinite}
+.field-label{position:absolute;color:#8f8279;font:9px ui-monospace,monospace;letter-spacing:.16em;pointer-events:none;opacity:.72}
+.field-input{left:5%;top:50%}.field-agent{left:47%;top:8%}.field-output{right:4%;top:50%}
