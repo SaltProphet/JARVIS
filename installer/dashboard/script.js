@@ -107,19 +107,7 @@ function installControls() {
  $('settings-drawer').addEventListener('keydown', event => { if (event.key !== 'Tab') return; const controls = [...$('settings-drawer').querySelectorAll('button,select,input')].filter(item => !item.disabled); const first = controls[0], last = controls[controls.length - 1]; if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); } });
  setPhase('READY');
 }
-function startSystemField() {
- const canvas = $('system-field'); if (!canvas) return; const ctx = canvas.getContext('2d');
- const rings = [0.19, 0.34, 0.49, 0.64, 0.78]; const points = [];
- rings.forEach((radius, layer) => { const count = 8 + layer * 5; for (let i = 0; i < count; i += 1) points.push({ radius, angle: (i / count) * Math.PI * 2 + layer * .31, layer, size: layer === 2 ? 4 : 2.5 }); });
- const resize = () => { const box = canvas.getBoundingClientRect(); const dpr = Math.min(window.devicePixelRatio || 1, 2); canvas.width = Math.max(1, Math.floor(box.width * dpr)); canvas.height = Math.max(1, Math.floor(box.height * dpr)); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); };
- resize(); window.addEventListener('resize', resize);
- const draw = time => { const box = canvas.getBoundingClientRect(); const w = box.width, h = box.height, cx = w / 2, cy = h / 2 + 2; const phase = ($('conversation-status')?.textContent || '').toLowerCase(); const active = talk.captureActive || phase.includes('transcrib') || phase.includes('waiting') || phase.includes('speaking'); const processing = phase.includes('transcrib') || phase.includes('waiting') || phase.includes('speaking'); const pulse = active ? 1 + Math.sin(time / 180) * .045 : 1 + Math.sin(time / 1200) * .018; ctx.clearRect(0, 0, w, h); ctx.save(); ctx.translate(cx, cy); ctx.scale(Math.min(1, w / 430), Math.min(1, h / 290));
-   ctx.strokeStyle = '#25282b'; ctx.lineWidth = 1; rings.forEach((radius, index) => { ctx.beginPath(); ctx.ellipse(0, 0, 150 * radius * pulse, 76 * radius, 0, 0, Math.PI * 2); ctx.strokeStyle = index === 2 && active ? '#754029' : '#25282b'; ctx.stroke(); });
-   const spin = time / 26000; points.forEach((point, index) => { const a = point.angle + spin * (point.layer % 2 ? -1 : 1); const x = Math.cos(a) * 150 * point.radius * pulse; const y = Math.sin(a) * 76 * point.radius; const onPath = active && (index + Math.floor(time / 210)) % 13 === 0; ctx.strokeStyle = onPath ? '#d46b2b' : '#a9aba8'; ctx.globalAlpha = onPath ? .95 : .55; ctx.strokeRect(x - point.size / 2, y - point.size / 2, point.size, point.size); });
-   ctx.globalAlpha = 1; ctx.strokeStyle = active ? '#d46b2b' : '#9b9a94'; ctx.lineWidth = active ? 1.8 : 1.2; ctx.strokeRect(-7 * pulse, -7 * pulse, 14 * pulse, 14 * pulse); ctx.beginPath(); ctx.moveTo(-155, 0); ctx.lineTo(-10, 0); ctx.moveTo(10, 0); ctx.lineTo(155, 0); ctx.strokeStyle = active ? '#754029' : '#292b2c'; ctx.stroke();
-   if (processing) { const progress = (time / 1100) % 1; ctx.fillStyle = phase.includes('speaking') ? '#b94238' : '#d46b2b'; ctx.globalAlpha = .9; ctx.fillRect(-145 + progress * 290, -1.5, 3, 3); }
-   ctx.restore(); requestAnimationFrame(draw); }; requestAnimationFrame(draw);
-}
+function startSystemField() { createLayeredField(); }
 async function load() { installControls(); startSystemField(); try { render(await fetch('/api/state').then(response => response.json())); } catch (error) { $('settings-error').textContent = error.message; } refreshServices(); loadAudioDevices(); fetch('/api/content').then(response => response.json()).then(value => $('library-list').textContent = `${value.total} documents across four shelves.`).catch(() => {}); fetch('/api/cron').then(response => response.json()).then(value => $('schedule-list').textContent = value.jobs?.length ? `${value.jobs.length} scheduled jobs.` : 'No scheduled jobs yet.').catch(() => {}); fetch('/docs.md').then(response => response.ok ? response.text() : Promise.reject()).then(value => $('docs-body').textContent = value).catch(() => $('docs-body').textContent = 'Documentation is unavailable.'); }
 load();
 

@@ -28,7 +28,7 @@
       <section id="home" class="view active">
         <div class="workspace-head"><h1>Conversation</h1><button class="quiet-button" id="new-thread">New thread</button></div>
         <section class="voice-panel card" aria-label="Voice interface">
-          <div class="orb-stage"><button id="orb" class="orb" aria-label="Start listening"><canvas id="system-field" aria-hidden="true"></canvas><span class="field-label field-input">INPUT</span><span class="field-label field-agent">AGENT</span><span class="field-label field-output">OUTPUT</span></button></div>
+          <div class="orb-stage"></div><button id="orb" class="record-button" aria-label="Start listening">◉ <span>Microphone</span></button>
           <div class="capture-status"><span id="conversation-status" role="status" hidden></span><div id="meter" class="meter" aria-label="Microphone level"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><span id="timer">00:00</span><button id="stop-capture" class="link-button" hidden>Stop</button><button id="cancel-reply" class="link-button" hidden>Cancel</button></div>
           <div class="mode-control"><button id="mode-toggle" class="mode-toggle" aria-label="Talk mode" aria-haspopup="true" aria-expanded="false" aria-controls="mode-menu"><span id="mode-label">Push to Talk</span><span aria-hidden="true">⌄</span></button><div id="mode-menu" class="mode-menu" hidden><button class="mode active" data-mode="ptt" aria-pressed="true">Push to Talk</button><button class="mode" data-mode="tap" aria-pressed="false">Tap to Talk</button><button class="mode" data-mode="always" aria-pressed="false">Always On</button></div></div>
         </section>
@@ -44,7 +44,7 @@
   </div>
   <div id="drawer-backdrop" class="drawer-backdrop" hidden></div>
   <aside id="settings-drawer" class="drawer" role="dialog" aria-modal="true" aria-label="Settings" aria-hidden="true" inert><div class="drawer-head"><div><p class="eyebrow">CONFIGURATION</p><h2>Settings</h2></div><button class="icon-button" data-close-drawer aria-label="Close settings">×</button></div><span id="input-name" class="sr-only">Default microphone</span><span id="capture-hint" class="sr-only">Hold Space to speak</span><label class="field-label" for="input-device">Microphone</label><select id="input-device"><option>Loading devices...</option></select><label class="field-label" for="output-device">Output</label><select id="output-device"><option>Loading devices...</option></select><label class="switch-row"><input id="spoken-replies" type="checkbox" checked><span>Spoken replies</span></label><label class="field-label" for="volume">Volume <output id="volume-value">80%</output></label><input id="volume" type="range" min="0" max="100" value="80"><div class="drawer-section"><p class="eyebrow">CONNECTIONS</p><div id="drawer-services" class="service-list"></div></div><p id="settings-error" class="error-text" role="alert"></p></aside>
-  <script src="script.js"></script>
+  <script src="field.js"></script><script src="script.js"></script>
 </body>
 </html>
 
