@@ -1,23 +1,51 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>JARVIS Mission Control</title><link rel="icon" href="/favicon.svg"><style>.conversation-overlay{margin:18px auto 0;max-width:420px;padding:12px;text-align:left;border:1px solid #20353d;background:#071116;color:#dce9ee;border-radius:4px;min-height:56px}.conversation-overlay .eyebrow{margin-bottom:7px}</style>
-  <script>window.__PORTRAITS__={default:'JV',dev:'DV',research:'RS',assistant:'AS'};window.__AV__=window.__PORTRAITS__;function AV(k){return window.__AV__[k]||'?';}</script>
-  <script src="conversation.js"></script><link rel="stylesheet" href="styles.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Mission Control</title>
+  <link rel="icon" href="/favicon.svg">
+  <link rel="stylesheet" href="styles.css">
+  <script src="conversation.js"></script>
 </head>
 <body>
-  <header><div class="brand">JARVIS / MISSION CONTROL <span id="owner-greeting"></span></div><div>UPLINK <span id="gateway">UNKNOWN</span> <span data-version>v0.1</span></div></header>
-  <main>
-    <nav class="tabs"><button data-view="home">HOME</button><button data-view="agents">AGENTS</button><button data-view="comms">COMMS</button><button data-view="schedule">SCHEDULE</button><button data-view="library">LIBRARY</button><button data-view="docs">DOCS</button><button data-view="control">CONTROL</button></nav>
-    <section id="home" class="view active"><div class="grid"><div class="card hero"><div><div class="orb" id="orb">JV</div><p>Tap the globe to speak.</p><div id="conversation-status" class="conversation-status">READY</div><div id="conversation-overlay" class="conversation-overlay" aria-live="polite"><div class="eyebrow">Live transcript</div><div id="conversation-transcript">Waiting for speech.</div></div><div class="crew" id="crew"></div></div></div><div class="card"><div class="eyebrow">Activity</div><div class="metric" id="tasks">-</div><p>logged tasks</p><div class="feed" id="feed"></div></div></div></section>
-    <section id="agents" class="view"><div class="card"><div class="eyebrow">Crew dossier</div><div id="agent-list"></div></div></section>
-    <section id="comms" class="view"><div class="card"><div class="eyebrow">Conversation</div><textarea id="message" rows="5" placeholder="Ask the selected profile..."></textarea><button id="send">Send</button> <button id="dictation-pause" type="button">Pause dictation</button> <a href="/upload">Upload fallback</a><pre id="reply"></pre></div></section>
-    <section id="schedule" class="view"><div class="card"><div class="eyebrow">Schedule</div><div id="schedule-list">No scheduled jobs yet.</div></div></section>
-    <section id="library" class="view"><div class="card"><div class="eyebrow">Library</div><div id="library-list"></div></div></section>
-    <section id="docs" class="view"><div class="card"><div class="eyebrow">Docs</div><pre id="docs-body"></pre><pre id="docs-seed" hidden>JARVIS Mission Control documentation is unavailable.</pre></div></section>
-    <section id="control" class="view"><div class="card"><div class="eyebrow">Control</div><div id="voice-controls">Voice controls are available when the local voice service is healthy.</div></div></section>
-  </main>
-  <script src="script.js"></script>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  <header class="topbar">
+    <div class="brand"><span>Mission Control</span></div>
+    <div class="topbar-right"><span class="version">BUILD <span data-version>v0.1</span></span></div>
+  </header>
+  <div class="app-shell">
+    <aside class="rail" aria-label="Primary navigation">
+      <button class="rail-link active" data-view="home"><span>⌂</span>Home</button>
+      <button class="rail-link" data-view="agents"><span>◇</span>Agents</button>
+      <button class="rail-link" data-view="comms"><span>↗</span>Comms</button>
+      <button class="rail-link" data-view="schedule"><span>◷</span>Schedule</button>
+      <button class="rail-link" data-view="library"><span>▤</span>Library</button>
+      <button class="rail-link" data-view="docs"><span>▥</span>Docs</button>
+      <button class="rail-link" data-view="control"><span>⚙</span>Control</button>
+      <div class="rail-bottom"><button class="rail-settings" data-drawer="settings" aria-label="Open settings"><span aria-hidden="true">⚙</span><span class="settings-label">Settings</span></button><div id="services" class="compact-services" aria-label="Service status"></div></div>
+    </aside>
+    <main id="main-content" tabindex="-1">
+      <section id="home" class="view active">
+        <div class="workspace-head"><h1>Conversation</h1><button class="quiet-button" id="new-thread">New thread</button></div>
+        <section class="voice-panel card" aria-label="Voice interface">
+          <div class="orb-stage"></div><button id="orb" class="record-button" aria-label="Start listening">◉ <span>Microphone</span></button><div id="model-runtime" class="model-runtime" role="status" aria-live="polite">Model · checking</div>
+          <div class="capture-status"><span id="conversation-status" role="status" hidden></span><div id="meter" class="meter" aria-label="Microphone level"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><span id="timer">00:00</span><button id="stop-capture" class="link-button" hidden>Stop</button><button id="cancel-reply" class="link-button" hidden>Cancel</button></div>
+          <div class="mode-control"><button id="mode-toggle" class="mode-toggle" aria-label="Talk mode" aria-haspopup="true" aria-expanded="false" aria-controls="mode-menu"><span id="mode-label">Push to Talk</span><span aria-hidden="true">⌄</span></button><div id="mode-menu" class="mode-menu" hidden><button class="mode active" data-mode="ptt" aria-pressed="true">Push to Talk</button><button class="mode" data-mode="tap" aria-pressed="false">Tap to Talk</button><button class="mode" data-mode="always" aria-pressed="false">Always On</button></div></div>
+        </section>
+        <section class="conversation-panel card" aria-label="Conversation"><div class="conversation-thread" id="conversation-thread" role="log" aria-live="polite"></div><div class="transcript-line" id="transcript-line" hidden><span id="transcript"></span></div><form id="home-compose" class="home-compose"><input id="home-message" aria-label="Message assistant" placeholder="Message…" maxlength="10000"><button id="home-send" aria-label="Send message">↗</button></form></section>
+      </section>
+      <section id="agents" class="view"><div class="workspace-head"><div><p class="eyebrow">ROUTING</p><h1>Agents</h1></div></div><div id="agent-list" class="agent-grid"></div></section>
+      <section id="comms" class="view"><div class="workspace-head"><div><p class="eyebrow">TEXT FALLBACK</p><h1>Comms</h1></div></div><section class="card compose-card"><label for="message" class="eyebrow">MESSAGE</label><textarea id="message" rows="5" placeholder="Send a text request to the selected agent..."></textarea><div class="compose-actions"><button id="send" class="primary-button">Send message</button><button id="dictation-pause" class="quiet-button">Pause dictation</button></div><pre id="reply" class="reply"></pre></section></section>
+      <section id="schedule" class="view"><div class="workspace-head"><div><p class="eyebrow">AUTOMATION</p><h1>Schedule</h1></div></div><section class="card"><div id="schedule-list" class="empty-state">Loading scheduled jobs...</div></section></section>
+      <section id="library" class="view"><div class="workspace-head"><div><p class="eyebrow">KNOWLEDGE</p><h1>Library</h1></div></div><section class="card"><div id="library-list" class="empty-state">Loading documents...</div></section></section>
+      <section id="docs" class="view"><div class="workspace-head"><div><p class="eyebrow">REFERENCE</p><h1>Docs</h1></div></div><section class="card"><pre id="docs-body" class="docs-body">Loading documentation...</pre></section></section>
+      <section id="control" class="view"><div class="workspace-head"><div><p class="eyebrow">OPERATIONS</p><h1>Control</h1></div></div><section class="card quick-card"><div class="context-row"><span>Active agent</span><strong id="active-agent">Default</strong></div><div class="context-row"><span>Logged tasks</span><strong id="tasks">—</strong></div><div class="context-row"><span>Output</span><strong id="output-state">Spoken + text</strong></div><div class="context-row"><span>Gateway</span><strong id="gateway">CHECKING</strong></div></section><section class="activity-card card"><div class="card-head"><strong>Recent activity</strong></div><div id="feed" class="activity-feed"></div></section><section class="card control-card"><p>Service lifecycle actions are available from Settings. No action is reported as successful until the local service confirms it.</p><button class="full-button" data-drawer="settings">Open service controls</button></section></section>
+    </main>
+  </div>
+  <div id="drawer-backdrop" class="drawer-backdrop" hidden></div>
+  <aside id="settings-drawer" class="drawer" role="dialog" aria-modal="true" aria-label="Settings" aria-hidden="true" inert><div class="drawer-head"><div><p class="eyebrow">CONFIGURATION</p><h2>Settings</h2></div><button class="icon-button" data-close-drawer aria-label="Close settings">×</button></div><span id="input-name" class="sr-only">Default microphone</span><span id="capture-hint" class="sr-only">Hold Space to speak</span><label class="field-label" for="input-device">Microphone</label><select id="input-device"><option>Loading devices...</option></select><label class="field-label" for="output-device">Output</label><select id="output-device"><option>Loading devices...</option></select><label class="switch-row"><input id="spoken-replies" type="checkbox" checked><span>Spoken replies</span></label><label class="field-label" for="volume">Volume <output id="volume-value">80%</output></label><input id="volume" type="range" min="0" max="100" value="80"><div class="drawer-section"><p class="eyebrow">CONNECTIONS</p><div id="drawer-services" class="service-list"></div></div><p id="settings-error" class="error-text" role="alert"></p></aside>
+  <script src="field.js"></script><script src="script.js"></script>
 </body>
 </html>
+

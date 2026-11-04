@@ -1,5 +1,6 @@
 import http.client
 import importlib.util
+import re
 import shutil
 import tempfile
 import threading
@@ -53,9 +54,9 @@ class DashboardStaticTests(unittest.TestCase):
 
             self.assertNotIn(b"__TEMPLATE__", index)
             self.assertIn(b"data-version", index)
+            self.assertIn(b"data-version", index)
             self.assertIn(b"conversation.js", index)
-            self.assertIn(b'id="conversation-overlay"', index)
-            self.assertIn(b'id="conversation-transcript"', index)
+            self.assertIn(b'id="conversation-thread"', index)
             self.assertIn(b"window.__TEMPLATE__=true", template)
             self.assertNotIn(b"data-version", template)
             self.assertIn(b"<script", template)
@@ -96,6 +97,74 @@ class DashboardStaticTests(unittest.TestCase):
                 status, _, _ = get(port, "/" + "a" * server.MAX_REQUEST_TARGET_BYTES)
                 self.assertEqual(status, 414)
 
+    def test_conversation_uses_local_capture_and_actual_audio_levels(self):
+        script = (DASHBOARD / "script.js").read_text(encoding="utf-8")
+        styles = (DASHBOARD / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn("getByteFrequencyData", script)
+        self.assertIn("recorder.ondataavailable", script)
+        self.assertIn("/api/transcribe", script)
+        self.assertNotIn("window.SpeechRecognition", script)
+        self.assertNotIn("window.webkitSpeechRecognition", script)
+        self.assertIn("conversation.interrupt()", script)
+        self.assertIn(".orb.is-listening", styles)
+
+    def test_space_hold_ignores_key_repeat_and_suppresses_keyboard_click(self):
+        script = (DASHBOARD / "script.js").read_text(encoding="utf-8")
+
+        self.assertIn("event.repeat", script)
+        self.assertIn("event.code === 'Space'", script)
+        self.assertIn("event.repeat", script)
+
+    def test_conversation_has_stable_modes_and_cancellable_reply(self):
+        script = (DASHBOARD / "script.js").read_text(encoding="utf-8")
+        page = (DASHBOARD / "index.html").read_text(encoding="utf-8")
+
+        self.assertIn("setMode", script)
+        self.assertIn("Talk mode", page)
+        self.assertIn("AbortController", script)
+        self.assertIn("cancel-reply", page)
+        self.assertIn('aria-expanded="false"', page)
+        self.assertIn("closeModeMenu()", script)
+        self.assertIn("always", script)
+
+    def test_conversation_has_local_media_recorder_fallback(self):
+        script = (DASHBOARD / "script.js").read_text(encoding="utf-8")
+
+        self.assertIn("navigator.mediaDevices.getUserMedia", script)
+        self.assertIn("MediaRecorder", script)
+        self.assertIn("/api/transcribe", script)
+
+    def test_redesigned_voice_workspace_has_thread_modes_meter_and_drawers(self):
+        page = (DASHBOARD / "index.html").read_text(encoding="utf-8")
+        script = (DASHBOARD / "script.js").read_text(encoding="utf-8")
+        styles = (DASHBOARD / "styles.css").read_text(encoding="utf-8")
+
+        for marker in ("conversation-thread", "drawer", "data-mode=\"ptt\"", "data-mode=\"tap\"", "data-mode=\"always\"", "id=\"meter\""):
+            self.assertIn(marker, page)
+        self.assertIn("/api/services", script)
+        self.assertIn("/api/audio/devices", script)
+        self.assertIn("always", script)
+        self.assertIn("--orange", styles)
+        self.assertNotIn("--glow", styles)
+        self.assertNotIn("JARVIS", page)
+
+    def test_conversation_speaks_agent_reply_through_local_voice_api(self):
+        script = (DASHBOARD / "script.js").read_text(encoding="utf-8")
+
+        self.assertIn("/api/voice", script)
+        self.assertIn("new Audio", script)
+
+    def test_talk_control_is_a_single_toggle_and_space_stops_explicitly(self):
+        script = (DASHBOARD / "script.js").read_text(encoding="utf-8")
+        page = (DASHBOARD / "index.html").read_text(encoding="utf-8")
+
+        self.assertIn('data-mode="ptt"', page)
+        self.assertIn("talk.mode === 'ptt'", script)
+        self.assertIn("if (talk.captureActive) stopSpeechTurn();", script)
+        self.assertRegex(script, re.compile(r"document\.addEventListener\('keyup'.*?stopSpeechTurn\(\);", re.S))
+
 
 if __name__ == "__main__":
     unittest.main()
+
