@@ -97,14 +97,15 @@ class DashboardStaticTests(unittest.TestCase):
                 status, _, _ = get(port, "/" + "a" * server.MAX_REQUEST_TARGET_BYTES)
                 self.assertEqual(status, 414)
 
-    def test_conversation_surfaces_audio_and_interim_transcription_state(self):
+    def test_conversation_uses_local_capture_and_actual_audio_levels(self):
         script = (DASHBOARD / "script.js").read_text(encoding="utf-8")
         styles = (DASHBOARD / "styles.css").read_text(encoding="utf-8")
 
-        self.assertIn("recognition.onresult", script)
-        self.assertIn("recognition.onend", script)
-        self.assertIn("recognition.onerror", script)
-        self.assertIn("let interim", script)
+        self.assertIn("getByteFrequencyData", script)
+        self.assertIn("recorder.ondataavailable", script)
+        self.assertIn("/api/transcribe", script)
+        self.assertNotIn("window.SpeechRecognition", script)
+        self.assertNotIn("window.webkitSpeechRecognition", script)
         self.assertIn("conversation.interrupt()", script)
         self.assertIn(".orb.is-listening", styles)
 
@@ -123,7 +124,8 @@ class DashboardStaticTests(unittest.TestCase):
         self.assertIn("Talk mode", page)
         self.assertIn("AbortController", script)
         self.assertIn("cancel-reply", page)
-        self.assertIn("recognition.start()", script)
+        self.assertIn('aria-expanded="false"', page)
+        self.assertIn("closeModeMenu()", script)
         self.assertIn("always", script)
 
     def test_conversation_has_local_media_recorder_fallback(self):
@@ -165,3 +167,4 @@ class DashboardStaticTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

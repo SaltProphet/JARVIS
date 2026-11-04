@@ -10,8 +10,8 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="brand"><span class="brand-mark" aria-hidden="true">M</span><span>Mission Control</span></div>
-    <div class="topbar-right"><span class="uplink-dot"></span><span id="gateway">CHECKING</span><span class="version">BUILD <span data-version>v0.1</span></span><button class="icon-button" data-drawer="settings" aria-label="Open settings">☷</button></div>
+    <div class="brand"><span>Mission Control</span></div>
+    <div class="topbar-right"><span class="version">BUILD <span data-version>v0.1</span></span></div>
   </header>
   <div class="app-shell">
     <aside class="rail" aria-label="Primary navigation">
@@ -22,41 +22,29 @@
       <button class="rail-link" data-view="library"><span>▤</span>Library</button>
       <button class="rail-link" data-view="docs"><span>▥</span>Docs</button>
       <button class="rail-link" data-view="control"><span>⚙</span>Control</button>
+      <div class="rail-bottom"><button class="rail-settings" data-drawer="settings" aria-label="Open settings"><span aria-hidden="true">⚙</span><span class="settings-label">Settings</span></button><div id="services" class="compact-services" aria-label="Service status"></div></div>
     </aside>
     <main>
       <section id="home" class="view active">
-        <div class="workspace-head"><div><p class="eyebrow">VOICE WORKSPACE</p><h1>Conversation</h1></div><button class="quiet-button" id="new-thread">+ New thread</button></div>
-        <div class="workspace-grid">
-          <section class="conversation-panel card">
-            <div class="thread-head"><div><span class="eyebrow">LOCAL THREAD</span><strong id="thread-title">New conversation</strong></div><span class="thread-state" id="conversation-status">READY</span></div>
-            <div class="conversation-thread" id="conversation-thread" aria-live="polite"><div class="empty-thread" id="empty-thread"><div class="empty-mark">◌</div><strong>Your conversation starts here</strong><span>Press and hold Space, or use the microphone.</span></div></div>
-            <div class="voice-dock">
-              <div class="mode-row" role="group" aria-label="Talk mode">
-                <button class="mode active" data-mode="ptt"><b>Push to Talk</b><small>Hold Space</small></button>
-                <button class="mode" data-mode="tap"><b>Tap to Talk</b><small>Click to toggle</small></button>
-                <button class="mode" data-mode="always"><b>Always On</b><small>Transcript only</small></button>
-              </div>
-              <div class="voice-controls"><div class="level-wrap"><span class="eyebrow">INPUT LEVEL</span><div id="meter" class="meter"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div><button id="orb" class="orb" aria-label="Start listening"><span class="orb-core">●</span></button><div class="voice-meta"><span id="timer">00:00</span><span id="input-name">Default microphone</span><span id="capture-hint">Hold Space to speak</span></div></div>
-              <div class="transcript-line"><span id="transcript">Waiting for speech.</span><button id="cancel-reply" class="link-button" hidden>Cancel</button></div>
-            </div>
-          </section>
-          <aside class="right-stack">
-            <section class="card status-card"><div class="card-head"><div><p class="eyebrow">SYSTEM STATUS</p><strong>Local services</strong></div><span class="status-live">LIVE</span></div><div id="services" class="service-list"><p class="muted">Checking local services...</p></div><button class="full-button" data-drawer="settings">Manage connections</button></section>
-            <section class="card quick-card"><p class="eyebrow">QUICK CONTEXT</p><div class="context-row"><span>Active agent</span><strong id="active-agent">Default</strong></div><div class="context-row"><span>Logged tasks</span><strong id="tasks">—</strong></div><div class="context-row"><span>Output</span><strong id="output-state">Spoken + text</strong></div></section>
-          </aside>
-        </div>
-        <section class="activity-card card"><div class="card-head"><div><p class="eyebrow">RECENT ACTIVITY</p><strong>Workspace events</strong></div><button class="link-button" data-view="comms">Open comms</button></div><div id="feed" class="activity-feed"><span class="muted">No activity yet.</span></div></section>
+        <div class="workspace-head"><h1>Conversation</h1><button class="quiet-button" id="new-thread">New thread</button></div>
+        <section class="voice-panel card" aria-label="Voice interface">
+          <div class="orb-stage"><button id="orb" class="orb" aria-label="Start listening"><svg viewBox="0 0 300 300" aria-hidden="true"><g><ellipse cx="150" cy="150" rx="100" ry="18" /><ellipse cx="150" cy="150" rx="100" ry="23" /><ellipse cx="150" cy="150" rx="100" ry="28" /><ellipse cx="150" cy="150" rx="100" ry="33" /><ellipse cx="150" cy="150" rx="100" ry="38" /><ellipse cx="150" cy="150" rx="100" ry="43" /><ellipse cx="150" cy="150" rx="100" ry="48" /><ellipse cx="150" cy="150" rx="100" ry="53" /><ellipse cx="150" cy="150" rx="100" ry="58" /><ellipse cx="150" cy="150" rx="100" ry="63" /><ellipse cx="150" cy="150" rx="100" ry="68" /><ellipse cx="150" cy="150" rx="100" ry="73" /><ellipse cx="150" cy="150" rx="100" ry="78" /><ellipse cx="150" cy="150" rx="100" ry="83" /><ellipse cx="150" cy="150" rx="100" ry="88" /><ellipse cx="150" cy="150" rx="100" ry="93" /><ellipse cx="150" cy="150" rx="100" ry="98" /><ellipse cx="150" cy="150" rx="14" ry="100" /><ellipse cx="150" cy="150" rx="26" ry="100" /><ellipse cx="150" cy="150" rx="38" ry="100" /><ellipse cx="150" cy="150" rx="50" ry="100" /><ellipse cx="150" cy="150" rx="62" ry="100" /><ellipse cx="150" cy="150" rx="74" ry="100" /><ellipse cx="150" cy="150" rx="86" ry="100" /><ellipse cx="150" cy="150" rx="98" ry="100" /></g><circle cx="150" cy="150" r="102" /></svg></button></div>
+          <div class="capture-status"><span id="conversation-status" role="status" hidden></span><div id="meter" class="meter" aria-label="Microphone level"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><span id="timer">00:00</span><button id="stop-capture" class="link-button" hidden>Stop</button><button id="cancel-reply" class="link-button" hidden>Cancel</button></div>
+          <div class="mode-control"><button id="mode-toggle" class="mode-toggle" aria-label="Talk mode" aria-haspopup="true" aria-expanded="false" aria-controls="mode-menu"><span id="mode-label">Push to Talk</span><span aria-hidden="true">⌄</span></button><div id="mode-menu" class="mode-menu" hidden><button class="mode active" data-mode="ptt" aria-pressed="true">Push to Talk</button><button class="mode" data-mode="tap" aria-pressed="false">Tap to Talk</button><button class="mode" data-mode="always" aria-pressed="false">Always On</button></div></div>
+        </section>
+        <section class="conversation-panel card" aria-label="Conversation"><div class="conversation-thread" id="conversation-thread" role="log" aria-live="polite"></div><div class="transcript-line" id="transcript-line" hidden><span id="transcript"></span></div><form id="home-compose" class="home-compose"><input id="home-message" aria-label="Message assistant" placeholder="Message…" maxlength="10000"><button id="home-send" aria-label="Send message">↗</button></form></section>
       </section>
       <section id="agents" class="view"><div class="workspace-head"><div><p class="eyebrow">ROUTING</p><h1>Agents</h1></div></div><div id="agent-list" class="agent-grid"></div></section>
       <section id="comms" class="view"><div class="workspace-head"><div><p class="eyebrow">TEXT FALLBACK</p><h1>Comms</h1></div></div><section class="card compose-card"><label for="message" class="eyebrow">MESSAGE</label><textarea id="message" rows="5" placeholder="Send a text request to the selected agent..."></textarea><div class="compose-actions"><button id="send" class="primary-button">Send message</button><button id="dictation-pause" class="quiet-button">Pause dictation</button></div><pre id="reply" class="reply"></pre></section></section>
       <section id="schedule" class="view"><div class="workspace-head"><div><p class="eyebrow">AUTOMATION</p><h1>Schedule</h1></div></div><section class="card"><div id="schedule-list" class="empty-state">Loading scheduled jobs...</div></section></section>
       <section id="library" class="view"><div class="workspace-head"><div><p class="eyebrow">KNOWLEDGE</p><h1>Library</h1></div></div><section class="card"><div id="library-list" class="empty-state">Loading documents...</div></section></section>
       <section id="docs" class="view"><div class="workspace-head"><div><p class="eyebrow">REFERENCE</p><h1>Docs</h1></div></div><section class="card"><pre id="docs-body" class="docs-body">Loading documentation...</pre></section></section>
-      <section id="control" class="view"><div class="workspace-head"><div><p class="eyebrow">OPERATIONS</p><h1>Control</h1></div></div><section class="card control-card"><p>Service lifecycle actions are available from Settings. No action is reported as successful until the local service confirms it.</p><button class="full-button" data-drawer="settings">Open service controls</button></section></section>
+      <section id="control" class="view"><div class="workspace-head"><div><p class="eyebrow">OPERATIONS</p><h1>Control</h1></div></div><section class="card quick-card"><div class="context-row"><span>Active agent</span><strong id="active-agent">Default</strong></div><div class="context-row"><span>Logged tasks</span><strong id="tasks">—</strong></div><div class="context-row"><span>Output</span><strong id="output-state">Spoken + text</strong></div><div class="context-row"><span>Gateway</span><strong id="gateway">CHECKING</strong></div></section><section class="activity-card card"><div class="card-head"><strong>Recent activity</strong></div><div id="feed" class="activity-feed"></div></section><section class="card control-card"><p>Service lifecycle actions are available from Settings. No action is reported as successful until the local service confirms it.</p><button class="full-button" data-drawer="settings">Open service controls</button></section></section>
     </main>
   </div>
   <div id="drawer-backdrop" class="drawer-backdrop" hidden></div>
-  <aside id="settings-drawer" class="drawer" aria-label="Settings" aria-hidden="true"><div class="drawer-head"><div><p class="eyebrow">CONFIGURATION</p><h2>Settings</h2></div><button class="icon-button" data-close-drawer aria-label="Close settings">×</button></div><label class="field-label" for="input-device">Microphone</label><select id="input-device"><option>Loading devices...</option></select><label class="field-label" for="output-device">Output</label><select id="output-device"><option>Loading devices...</option></select><label class="switch-row"><input id="spoken-replies" type="checkbox" checked><span>Spoken replies</span></label><label class="field-label" for="volume">Volume <output id="volume-value">80%</output></label><input id="volume" type="range" min="0" max="100" value="80"><div class="drawer-section"><p class="eyebrow">CONNECTIONS</p><div id="drawer-services" class="service-list"></div></div><p id="settings-error" class="error-text" role="alert"></p></aside>
+  <aside id="settings-drawer" class="drawer" role="dialog" aria-modal="true" aria-label="Settings" aria-hidden="true" inert><div class="drawer-head"><div><p class="eyebrow">CONFIGURATION</p><h2>Settings</h2></div><button class="icon-button" data-close-drawer aria-label="Close settings">×</button></div><span id="input-name" class="sr-only">Default microphone</span><span id="capture-hint" class="sr-only">Hold Space to speak</span><label class="field-label" for="input-device">Microphone</label><select id="input-device"><option>Loading devices...</option></select><label class="field-label" for="output-device">Output</label><select id="output-device"><option>Loading devices...</option></select><label class="switch-row"><input id="spoken-replies" type="checkbox" checked><span>Spoken replies</span></label><label class="field-label" for="volume">Volume <output id="volume-value">80%</output></label><input id="volume" type="range" min="0" max="100" value="80"><div class="drawer-section"><p class="eyebrow">CONNECTIONS</p><div id="drawer-services" class="service-list"></div></div><p id="settings-error" class="error-text" role="alert"></p></aside>
   <script src="script.js"></script>
 </body>
 </html>
+
