@@ -17,6 +17,11 @@ main{width:100%;max-width:1250px;margin:0 auto;padding:30px 36px 40px;min-width:
 @media(prefers-reduced-motion:reduce){.orb.is-listening{animation:none}.drawer{transition:none}}
 
 /* Layered Field system visualization */
+.skip-link{position:fixed;top:8px;left:8px;z-index:100;background:#eee;color:#111;padding:12px;transform:translateY(-200%)}.skip-link:focus{transform:none}
+:root{--muted:#b2b2b2;--dim:#aaa;--orange:#d38a59;--red:#df8074}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid #e4a67b;outline-offset:3px}
+button{min-height:44px}.service-indicator{width:44px;height:44px}.service-action{min-width:44px;padding:8px}.link-button{min-width:44px}.mode-toggle{min-height:44px}.rail-link{color:#b2b2b2}.field-node small{color:#b2b2b2}.field-node{min-height:44px}.home-compose input{font-size:16px}.home-compose button{width:44px;height:44px}.record-button{min-height:44px}.service-dot{outline:1px solid #888}.drawer select{font-size:16px}.message.system{color:#e99b91}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 .model-runtime{position:absolute;left:150px;right:15px;bottom:61px;font:10px ui-monospace,monospace;color:#aaa;overflow-wrap:anywhere}.model-runtime[data-state=loaded]{color:#ccc}.model-runtime[data-state=loading]{color:#ce8a54}@media(max-width:700px){.model-runtime{font-size:9px;left:135px;bottom:55px}}
 .orb{width:min(100%,430px);height:290px;cursor:pointer}
 .orb svg{display:none}
