@@ -42,6 +42,8 @@ UPLOAD_TYPES = {
     ".svg": "image/svg+xml",
 }
 UPLOAD_LOCK = threading.Lock()
+STT_LOCK = threading.Lock()
+STT_MODEL = None
 CREW = [
     {"key": "default", "name": "JARVIS", "code": "J-00", "initials": "JV", "role": "Chief of staff", "tagline": "Routes, verifies, reports"},
     {"key": "dev", "name": "DEV", "code": "J-01", "initials": "DV", "role": "Build engineer", "tagline": "Makes the machine useful"},
@@ -51,6 +53,42 @@ CREW = [
 
 def now_ms() -> int:
     return int(time.time() * 1000)
+
+
+def transcribe_audio(body: bytes, content_type: str) -> str:
+    """Transcribe one browser audio clip with the local faster-whisper model."""
+    global STT_MODEL
+    model_path = os.environ.get("JARVIS_STT_MODEL", "base")
+    device = os.environ.get("JARVIS_STT_DEVICE", "cpu")
+    compute_type = os.environ.get("JARVIS_STT_COMPUTE_TYPE", "int8")
+    runtime_device = device
+    suffix = ".webm" if "webm" in content_type else ".wav"
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as stream:
+        clip = Path(stream.name)
+        stream.write(body)
+    try:
+        with STT_LOCK:
+            if STT_MODEL is None:
+                from faster_whisper import WhisperModel
+                try:
+                    STT_MODEL = WhisperModel(model_path, device=device, compute_type=compute_type)
+                except Exception:
+                    if device != "cuda":
+                        raise
+                    STT_MODEL = WhisperModel(model_path, device="cpu", compute_type="int8")
+                    runtime_device = "cpu"
+        try:
+            segments, _ = STT_MODEL.transcribe(str(clip), language="en", vad_filter=True)
+        except Exception:
+            if runtime_device != "cuda":
+                raise
+            with STT_LOCK:
+                from faster_whisper import WhisperModel
+                STT_MODEL = WhisperModel(model_path, device="cpu", compute_type="int8")
+            segments, _ = STT_MODEL.transcribe(str(clip), language="en", vad_filter=True)
+        return " ".join(segment.text.strip() for segment in segments).strip()
+    finally:
+        clip.unlink(missing_ok=True)
 
 
 def read_version() -> str:
@@ -466,7 +504,16 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_response(200); self.send_header("Content-Type", "audio/wav"); self.send_header("X-Jarvis-Voice-Engine", "kokoro"); self.send_header("Content-Length", str(len(audio))); self.end_headers(); self.wfile.write(audio); return
             except Exception as exc: return json_response(self, {"error": str(exc)}, 502)
         if path == "/api/greeting": return json_response(self, {"error": "greeting cache is not generated"}, 404)
-        if path == "/api/transcribe": return json_response(self, {"error": "ElevenLabs transcription is not enabled"}, 501)
+        if path == "/api/transcribe":
+            if not raw:
+                return json_response(self, {"error": "audio body is required"}, 400)
+            content_type = self.headers.get("Content-Type", "")
+            if not content_type.startswith("audio/"):
+                return json_response(self, {"error": "Content-Type must be audio/*"}, 400)
+            try:
+                return json_response(self, {"text": transcribe_audio(raw, content_type)})
+            except Exception as exc:
+                return json_response(self, {"error": str(exc)}, 502)
         return json_response(self, {"error": "not found"}, 404)
 
 if __name__ == "__main__":

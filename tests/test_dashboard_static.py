@@ -54,6 +54,7 @@ class DashboardStaticTests(unittest.TestCase):
 
             self.assertNotIn(b"__TEMPLATE__", index)
             self.assertIn(b"data-version", index)
+            self.assertIn(b"| VERSION <span data-version>", index)
             self.assertIn(b"conversation.js", index)
             self.assertIn(b'id="conversation-overlay"', index)
             self.assertIn(b'id="conversation-transcript"', index)
@@ -125,6 +126,19 @@ class DashboardStaticTests(unittest.TestCase):
         self.assertIn("cancel-reply", page)
         self.assertIn("recognition.start()", script)
         self.assertIn("RECONNECTING", script)
+
+    def test_conversation_has_local_media_recorder_fallback(self):
+        script = (DASHBOARD / "script.js").read_text(encoding="utf-8")
+
+        self.assertIn("navigator.mediaDevices.getUserMedia", script)
+        self.assertIn("MediaRecorder", script)
+        self.assertIn("/api/transcribe", script)
+
+    def test_conversation_speaks_agent_reply_through_local_voice_api(self):
+        script = (DASHBOARD / "script.js").read_text(encoding="utf-8")
+
+        self.assertIn("/api/voice", script)
+        self.assertIn("new Audio", script)
 
     def test_talk_control_is_a_single_toggle_and_space_stops_explicitly(self):
         script = (DASHBOARD / "script.js").read_text(encoding="utf-8")

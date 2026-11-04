@@ -76,11 +76,76 @@ function stopRecognition() {
   recognition.stop();
 }
 
+function stopMediaCapture() {
+  talk.captureActive = false;
+  const recorder = window.__jarvisMediaRecorder;
+  window.__jarvisMediaRecorder = null;
+  if (recorder && recorder.state !== 'inactive') recorder.stop();
+  if (window.__jarvisMediaStream) {
+    window.__jarvisMediaStream.getTracks().forEach(track => track.stop());
+    window.__jarvisMediaStream = null;
+  }
+}
+
+async function startMediaCapture(generation) {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    if (generation !== conversation.dictationGeneration || talk.stopRequested) {
+      stream.getTracks().forEach(track => track.stop());
+      return;
+    }
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
+    const recorder = new MediaRecorder(stream, { mimeType });
+    const chunks = [];
+    window.__jarvisMediaStream = stream;
+    window.__jarvisMediaRecorder = recorder;
+    recorder.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
+    recorder.onerror = () => { stopMediaCapture(); conversation.interrupt(); renderTranscript(); setPhase('MIC ERROR'); };
+    recorder.onstart = () => setActivity('AUDIO');
+    recorder.onstop = async () => {
+      if (window.__jarvisMediaRecorder === recorder) window.__jarvisMediaRecorder = null;
+      stream.getTracks().forEach(track => track.stop());
+      window.__jarvisMediaStream = null;
+      if (!chunks.length || generation !== conversation.dictationGeneration) return;
+      try {
+        setPhase('TRANSCRIBING');
+        const response = await fetch('/api/transcribe', { method: 'POST', headers: { 'Content-Type': mimeType }, body: new Blob(chunks, { type: mimeType }) });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || 'transcription failed');
+        conversation.acceptDictation(generation, payload.text);
+        renderTranscript();
+        finishSpeechTurn(generation);
+      } catch (error) {
+        conversation.interrupt();
+        renderTranscript();
+        setPhase(`TRANSCRIPTION ERROR: ${error.message}`);
+      }
+    };
+    recorder.start();
+    if (talk.stopRequested) stopMediaCapture();
+  } catch (error) {
+    conversation.interrupt();
+    renderTranscript();
+    setPhase(`MIC ERROR: ${error.name || 'permission denied'}`);
+  }
+}
+
 async function sendMessage(text, agent = selected.key, signal) {
   const response = await fetch('/api/chat/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent, text }), signal });
   const reply = await response.text();
   if (!response.ok) throw new Error(reply || 'chat request failed');
   return reply;
+}
+
+async function speakReply(text) {
+  if (window.__jarvisAudio) window.__jarvisAudio.pause();
+  const response = await fetch('/api/voice', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
+  if (!response.ok) throw new Error('voice request failed');
+  const url = URL.createObjectURL(await response.blob());
+  const audio = new Audio(url);
+  window.__jarvisAudio = audio;
+  audio.onended = () => { URL.revokeObjectURL(url); if (window.__jarvisAudio === audio) window.__jarvisAudio = null; };
+  await audio.play();
 }
 
 function beginSpeechTurn() {
@@ -92,6 +157,10 @@ function beginSpeechTurn() {
   talk.stopRequested = false;
   renderTranscript();
   setPhase('LISTENING');
+  if (navigator.mediaDevices?.getUserMedia && window.MediaRecorder) {
+    startMediaCapture(generation);
+    return;
+  }
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!Recognition) {
     conversation.interrupt();
@@ -135,21 +204,33 @@ function beginSpeechTurn() {
    try { recognition.start(); } catch (error) { if (generation === conversation.dictationGeneration) { talk.stopRequested = true; conversation.interrupt(); renderTranscript(); setPhase(`MIC ERROR: ${error.name || 'start failed'}`); } return; }
 }
 
+function finishSpeechTurn(generation) {
+  if (!conversation || !conversation.finishPushToTalk(generation)) {
+    if (conversation) { conversation.interrupt(); renderTranscript(); setPhase('READY'); }
+    return;
+  }
+  setPhase('WAITING FOR REPLY');
+  const text = conversation.transcript;
+  const controller = new AbortController();
+  window.__jarvisReplyController = controller;
+  sendMessage(text, selected.key, controller.signal).then(reply => { if (window.__jarvisReplyController !== controller) return; window.__jarvisReplyController = null; document.getElementById('reply').textContent = reply; conversation.beginSpeaking(); setPhase('REPLY'); speakReply(reply).catch(error => setPhase(`VOICE ERROR: ${error.message}`)); window.__jarvisRestTimer = setTimeout(() => { conversation.interrupt(); renderTranscript(); }, REST_MS); }).catch(error => { if (error.name === 'AbortError' || window.__jarvisReplyController !== controller) return; window.__jarvisReplyController = null; document.getElementById('reply').textContent = error.message; conversation.interrupt(); renderTranscript(); setPhase('ERROR'); });
+}
+
 function stopSpeechTurn(generation = conversation?.dictationGeneration) {
   if (window.__jarvisPushTimer) { clearTimeout(window.__jarvisPushTimer); window.__jarvisPushTimer = null; }
   talk.stopRequested = true;
+  if (window.__jarvisMediaRecorder) {
+    setPhase('TRANSCRIBING');
+    stopMediaCapture();
+    return;
+  }
   stopRecognition();
-  if (conversation && conversation.finishPushToTalk(generation)) {
-    setPhase('WAITING FOR REPLY');
-    const text = conversation.transcript;
-    const controller = new AbortController();
-    window.__jarvisReplyController = controller;
-    sendMessage(text, selected.key, controller.signal).then(reply => { if (window.__jarvisReplyController !== controller) return; window.__jarvisReplyController = null; document.getElementById('reply').textContent = reply; conversation.beginSpeaking(); setPhase('REPLY'); window.__jarvisRestTimer = setTimeout(() => { conversation.interrupt(); renderTranscript(); }, REST_MS); }).catch(error => { if (error.name === 'AbortError' || window.__jarvisReplyController !== controller) return; window.__jarvisReplyController = null; document.getElementById('reply').textContent = error.message; conversation.interrupt(); renderTranscript(); setPhase('ERROR'); });
-  } else if (conversation) { conversation.interrupt(); renderTranscript(); setPhase('READY'); }
+  finishSpeechTurn(generation);
 }
 
 function cancelReply() {
   if (window.__jarvisReplyController) { window.__jarvisReplyController.abort(); window.__jarvisReplyController = null; }
+  if (window.__jarvisAudio) { window.__jarvisAudio.pause(); window.__jarvisAudio = null; }
   if (conversation?.phase === 'waiting-for-reply') conversation.interrupt();
   const reply = document.getElementById('reply');
   if (reply) reply.textContent = 'Reply cancelled.';
