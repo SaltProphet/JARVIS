@@ -28,7 +28,7 @@
       <section id="home" class="view active">
         <div class="workspace-head"><h1>Conversation</h1><button class="quiet-button" id="new-thread">New thread</button></div>
         <section class="voice-panel card" aria-label="Voice interface">
-          <div class="orb-stage"></div><button id="orb" class="record-button" aria-label="Start listening">◉ <span>Microphone</span></button>
+          <div class="orb-stage"></div><button id="orb" class="record-button" aria-label="Start listening">◉ <span>Microphone</span></button><div id="model-runtime" class="model-runtime" role="status" aria-live="polite">Model · checking</div>
           <div class="capture-status"><span id="conversation-status" role="status" hidden></span><div id="meter" class="meter" aria-label="Microphone level"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><span id="timer">00:00</span><button id="stop-capture" class="link-button" hidden>Stop</button><button id="cancel-reply" class="link-button" hidden>Cancel</button></div>
           <div class="mode-control"><button id="mode-toggle" class="mode-toggle" aria-label="Talk mode" aria-haspopup="true" aria-expanded="false" aria-controls="mode-menu"><span id="mode-label">Push to Talk</span><span aria-hidden="true">⌄</span></button><div id="mode-menu" class="mode-menu" hidden><button class="mode active" data-mode="ptt" aria-pressed="true">Push to Talk</button><button class="mode" data-mode="tap" aria-pressed="false">Tap to Talk</button><button class="mode" data-mode="always" aria-pressed="false">Always On</button></div></div>
         </section>

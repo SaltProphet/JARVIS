@@ -1,4 +1,11 @@
 function createLayeredField() {
+ async function refreshModel() {
+  const indicator=document.getElementById('model-runtime');
+  try {const response=await fetch('/api/models/runtime');if(!response.ok)throw new Error('Status unavailable');const data=await response.json();indicator.textContent=`Model · ${data.state}${data.models.length?' · '+data.models.join(', '):''} | STT · ${data.speech.state}`;indicator.dataset.state=data.state;indicator.title=data.detail+'; speech model: '+data.speech.name;}
+  catch(error){indicator.textContent='Model · unknown';indicator.dataset.state='unknown';indicator.title=error.message;}
+  setTimeout(refreshModel,3000);
+ }
+ refreshModel();
  const host = document.querySelector('.orb-stage');
  host.innerHTML = '<canvas id="system-field" aria-hidden="true"></canvas><div class="field-nodes">'+['Input','Whisper','Agent','Kokoro'].map((name,i)=>`<button class="field-node" data-layer="${i}">${name}<small>Checking</small></button>`).join('')+'</div>';
  const canvas = document.getElementById('system-field'), ctx = canvas.getContext('2d');

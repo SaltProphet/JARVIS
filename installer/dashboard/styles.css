@@ -17,6 +17,7 @@ main{width:100%;max-width:1250px;margin:0 auto;padding:30px 36px 40px;min-width:
 @media(prefers-reduced-motion:reduce){.orb.is-listening{animation:none}.drawer{transition:none}}
 
 /* Layered Field system visualization */
+.model-runtime{position:absolute;left:150px;right:15px;bottom:61px;font:10px ui-monospace,monospace;color:#aaa;overflow-wrap:anywhere}.model-runtime[data-state=loaded]{color:#ccc}.model-runtime[data-state=loading]{color:#ce8a54}@media(max-width:700px){.model-runtime{font-size:9px;left:135px;bottom:55px}}
 .orb{width:min(100%,430px);height:290px;cursor:pointer}
 .orb svg{display:none}
 .orb canvas{display:block;width:100%;height:100%}

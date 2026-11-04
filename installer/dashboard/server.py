@@ -54,6 +54,19 @@ CREW = [
     {"key": "assistant", "name": "ASSISTANT", "code": "J-03", "initials": "AS", "role": "Executive assistant", "tagline": "Quietly keeps the day moving"},
 ]
 
+def model_runtime_status():
+    speech = {"name": os.environ.get("JARVIS_STT_MODEL", "base"), "state": "loaded" if STT_MODEL is not None else "loading" if STT_LOCK.locked() else "unloaded"}
+    try:
+        host = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434").rstrip("/")
+        if not host.startswith(("http://", "https://")):
+            host = "http://" + host
+        with urllib.request.urlopen(host + "/api/ps", timeout=2) as response:
+            models = json.load(response).get("models", [])
+        return {"state": "loaded" if models else "unloaded", "models": [item.get("name", "Unknown") for item in models], "speech": speech, "detail": "Ollama residency; loading transitions unavailable from this provider"}
+    except Exception as exc:
+        return {"state": "unknown", "models": [], "speech": speech, "detail": "Model runtime unavailable: " + str(exc)}
+
+
 def now_ms() -> int:
     return int(time.time() * 1000)
 
@@ -458,6 +471,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.wfile.write(b"event: state\ndata: " + data + b"\n\n"); self.wfile.flush(); time.sleep(3)
             except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError): return
         if path == "/api/state": return json_response(self, state())
+        if path == "/api/models/runtime": return json_response(self, model_runtime_status())
         if path == "/api/services": return json_response(self, {"services": list(service_status().values())})
         if path == "/api/audio/devices": return json_response(self, audio_devices())
         if path == "/api/content": return json_response(self, shelves())
@@ -613,3 +627,4 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     ROOT.mkdir(parents=True, exist_ok=True)
     JarvisHTTPServer((HOST, PORT), Handler).serve_forever()
+
