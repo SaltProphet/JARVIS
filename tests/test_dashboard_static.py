@@ -164,6 +164,28 @@ class DashboardStaticTests(unittest.TestCase):
         self.assertIn("if (talk.captureActive) stopSpeechTurn();", script)
         self.assertRegex(script, re.compile(r"document\.addEventListener\('keyup'.*?stopSpeechTurn\(\);", re.S))
 
+    def test_current_voice_workspace_restores_owner_shortcuts_and_upload_fallback(self):
+        page = (DASHBOARD / "index.html").read_text(encoding="utf-8")
+        script = (DASHBOARD / "script.js").read_text(encoding="utf-8")
+
+        self.assertIn('id="owner-greeting"', page)
+        self.assertIn('href="/upload"', page)
+        self.assertIn("/api/owner", script)
+        self.assertIn("event.key === 'Escape'", script)
+        self.assertIn("['default', 'dev', 'research', 'assistant']", script)
+
+    def test_current_voice_workspace_exposes_live_transcript_and_field_renderer(self):
+        page = (DASHBOARD / "index.html").read_text(encoding="utf-8")
+        script = (DASHBOARD / "script.js").read_text(encoding="utf-8")
+        field = (DASHBOARD / "field.js").read_text(encoding="utf-8")
+
+        self.assertIn('id="conversation-status"', page)
+        self.assertIn('id="transcript-line"', page)
+        self.assertIn('id="transcript"', page)
+        self.assertIn('id="stop-capture"', page)
+        self.assertIn("createLayeredField", script)
+        self.assertIn("prefers-reduced-motion", field)
+
 
 if __name__ == "__main__":
     unittest.main()
