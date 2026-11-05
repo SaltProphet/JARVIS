@@ -3,3 +3,7 @@ installer/state/
 tests/.tmp/
 *.pyc
 __pycache__/
+
+console/node_modules/
+console/.vercel/
+console/dist/
