@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import {
   AudioLines,
   BookOpen,
@@ -17,13 +17,15 @@ import { useMission, type ChatMessage } from "@/lib/store";
 import { FieldCanvas } from "@/components/field-canvas";
 import { GraphCanvas } from "@/components/graph-canvas";
 
+type SpeechResult = ArrayLike<{ transcript: string }> & { isFinal: boolean };
+
 type SpeechCtor = new () => {
   lang: string;
   interimResults: boolean;
   continuous: boolean;
   start: () => void;
   stop: () => void;
-  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  onresult: ((event: { results: ArrayLike<SpeechResult> }) => void) | null;
   onerror: (() => void) | null;
   onend: (() => void) | null;
 };
@@ -68,6 +70,9 @@ export function Mission() {
   const scroller = useRef<HTMLDivElement>(null);
   const recognition = useRef<InstanceType<SpeechCtor> | null>(null);
   const audio = useRef<HTMLAudioElement | null>(null);
+  const holding = useRef(false);
+  const heard = useRef("");
+  const sentUtterance = useRef(false);
 
   useEffect(() => {
     void Promise.resolve(useMission.persist.rehydrate()).finally(() => markHydrated());
@@ -144,27 +149,52 @@ export function Mission() {
     }
   }
 
-  function holdStart() {
+  function holdStart(event: PointerEvent<HTMLButtonElement>) {
+    event.preventDefault();
     const Ctor = speechCtor();
     if (!Ctor) {
       setError("This browser has no speech recognition. Type instead.");
       return;
     }
+    event.currentTarget.setPointerCapture(event.pointerId);
+    holding.current = true;
+    heard.current = "";
+    sentUtterance.current = false;
     const rec = new Ctor();
     rec.lang = "en-US";
-    rec.interimResults = false;
-    rec.continuous = false;
-    rec.onresult = (event) => {
-      const said = event.results[0]?.[0]?.transcript ?? "";
-      if (said) void send(said);
+    rec.interimResults = true;
+    rec.continuous = true;
+    rec.onresult = (resultEvent) => {
+      let text = "";
+      for (let index = 0; index < resultEvent.results.length; index += 1) {
+        text += resultEvent.results[index]?.[0]?.transcript ?? "";
+      }
+      const shown = text.trim();
+      if (!shown) return;
+      heard.current = shown;
+      setDraft(shown);
     };
     rec.onerror = () => {
+      if (holding.current) return;
       setListening(false);
       setPhase("Idle");
     };
     rec.onend = () => {
+      if (holding.current) {
+        try {
+          rec.start();
+        } catch {
+          setListening(false);
+        }
+        return;
+      }
       setListening(false);
       setPhase((currentPhase) => (currentPhase === "Listening" ? "Idle" : currentPhase));
+      const said = heard.current.trim();
+      heard.current = "";
+      if (!said || sentUtterance.current) return;
+      sentUtterance.current = true;
+      void send(said);
     };
     recognition.current = rec;
     setListening(true);
@@ -173,12 +203,14 @@ export function Mission() {
     try {
       rec.start();
     } catch {
+      holding.current = false;
       setListening(false);
       setError("Microphone did not start.");
     }
   }
 
   function holdStop() {
+    holding.current = false;
     recognition.current?.stop();
     setListening(false);
   }
