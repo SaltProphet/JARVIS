@@ -1,7 +1,15 @@
 import { createServerFn } from "@tanstack/react-start";
-import { agentByKey, systemPrompt, voiceFor, type AgentKey } from "@/lib/crew";
+import { agentByKey, type AgentKey } from "@/lib/crew";
 
 type HistoryTurn = { role: "user" | "assistant"; text: string };
+
+function dashboard() {
+  return (process.env.JARVIS_DASHBOARD_URL || "http://127.0.0.1:8899").replace(/\/$/, "");
+}
+
+function offline() {
+  return `Dashboard is not running at ${dashboard()}.`;
+}
 
 function parseAsk(input: unknown) {
   if (!input || typeof input !== "object") throw new Error("Missing request.");
@@ -22,45 +30,24 @@ function parseAsk(input: unknown) {
   return { agent, text, history };
 }
 
-function splitTopic(content: string) {
-  const match = content.match(/\n?TOPIC:\s*(.+)\s*$/i);
-  const topic = match?.[1]?.replace(/^["']|["']$/g, "").trim().slice(0, 64);
-  const text = (match ? content.slice(0, match.index) : content).trim();
-  return { text: text || content.trim(), topic: topic || "Open thread" };
-}
-
 export const askCrew = createServerFn({ method: "POST" })
   .validator(parseAsk)
   .handler(async ({ data }) => {
-    const apiKey = process.env.XAI_API_KEY;
-    if (!apiKey) return { ok: false as const, error: "The crew is offline in this environment." };
-
-    const messages = [
-      { role: "system", content: systemPrompt(data.agent) },
-      ...data.history.map((turn) => ({ role: turn.role, content: turn.text })),
-      { role: "user", content: data.text },
-    ];
-
-    const res = await fetch("https://api.x.ai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "grok-4.5",
-        max_tokens: 280,
-        temperature: 0.6,
-        messages,
-      }),
-    });
-
-    if (!res.ok) return { ok: false as const, error: `Crew request failed (${res.status}).` };
-    const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-    const content = body.choices?.[0]?.message?.content?.trim();
-    if (!content) return { ok: false as const, error: "Empty reply." };
-    const parsed = splitTopic(content);
-    return { ok: true as const, agent: data.agent, ...parsed };
+    let res: Response;
+    try {
+      res = await fetch(`${dashboard()}/api/chat/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agent: data.agent, text: data.text }),
+      });
+    } catch {
+      return { ok: false as const, error: offline() };
+    }
+    const reply = (await res.text()).trim();
+    if (!res.ok) return { ok: false as const, error: reply || "Hermes did not answer." };
+    if (!reply) return { ok: false as const, error: "Hermes returned an empty reply." };
+    const topic = reply.split("\n")[0]?.trim().slice(0, 48);
+    return { ok: true as const, agent: data.agent, text: reply, topic };
   });
 
 function parseSpeak(input: unknown) {
@@ -72,31 +59,60 @@ function parseSpeak(input: unknown) {
   return { text, agent };
 }
 
+function toBase64(bytes: Uint8Array) {
+  let binary = "";
+  const chunk = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + chunk));
+  }
+  return btoa(binary);
+}
+
 export const speakReply = createServerFn({ method: "POST" })
   .validator(parseSpeak)
   .handler(async ({ data }) => {
-    const apiKey = process.env.XAI_API_KEY;
-    if (!apiKey) return { ok: false as const, error: "Voice is offline." };
-
-    async function call(voice: string) {
-      return fetch("https://api.x.ai/v1/tts", {
+    let res: Response;
+    try {
+      res = await fetch(`${dashboard()}/api/voice`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({ text: data.text, voice_id: voice, language: "en" }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: data.text }),
       });
+    } catch {
+      return { ok: false as const, error: offline() };
     }
+    if (!res.ok) return { ok: false as const, error: "Kokoro did not answer." };
+    return {
+      ok: true as const,
+      audio: toBase64(new Uint8Array(await res.arrayBuffer())),
+      mime: "audio/wav",
+    };
+  });
 
-    let res = await call(voiceFor(data.agent));
-    if (!res.ok) res = await call("eve");
-    if (!res.ok) return { ok: false as const, error: `Voice failed (${res.status}).` };
-    const bytes = new Uint8Array(await res.arrayBuffer());
-    let binary = "";
-    const chunk = 0x8000;
-    for (let i = 0; i < bytes.length; i += chunk) {
-      binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+function parseClip(input: unknown) {
+  if (!input || typeof input !== "object") throw new Error("Missing audio.");
+  const raw = input as { audio?: unknown; mime?: unknown };
+  const audio = typeof raw.audio === "string" ? raw.audio : "";
+  const mime = typeof raw.mime === "string" && raw.mime.startsWith("audio/") ? raw.mime : "audio/webm";
+  if (!audio || audio.length > 8_000_000) throw new Error("Audio clip is empty or too large.");
+  return { audio, mime };
+}
+
+export const transcribeClip = createServerFn({ method: "POST" })
+  .validator(parseClip)
+  .handler(async ({ data }) => {
+    const bytes = Buffer.from(data.audio, "base64");
+    let res: Response;
+    try {
+      res = await fetch(`${dashboard()}/api/transcribe`, {
+        method: "POST",
+        headers: { "Content-Type": data.mime },
+        body: bytes,
+      });
+    } catch {
+      return { ok: false as const, error: offline() };
     }
-    return { ok: true as const, audio: btoa(binary), mime: res.headers.get("content-type") || "audio/mpeg" };
+    const payload = (await res.json().catch(() => null)) as { text?: string; error?: string } | null;
+    if (!res.ok) return { ok: false as const, error: payload?.error || "Transcription failed." };
+    return { ok: true as const, text: payload?.text?.trim() || "" };
   });

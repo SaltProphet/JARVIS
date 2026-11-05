@@ -12,29 +12,10 @@ import {
   Trash2,
 } from "lucide-react";
 import { AGENTS, agentByKey, type AgentKey } from "@/lib/crew";
-import { askCrew, speakReply } from "@/lib/chat.functions";
+import { askCrew, speakReply, transcribeClip } from "@/lib/chat.functions";
 import { useMission, type ChatMessage } from "@/lib/store";
 import { FieldCanvas } from "@/components/field-canvas";
 import { GraphCanvas } from "@/components/graph-canvas";
-
-type SpeechResult = ArrayLike<{ transcript: string }> & { isFinal: boolean };
-
-type SpeechCtor = new () => {
-  lang: string;
-  interimResults: boolean;
-  continuous: boolean;
-  start: () => void;
-  stop: () => void;
-  onresult: ((event: { results: ArrayLike<SpeechResult> }) => void) | null;
-  onerror: (() => void) | null;
-  onend: (() => void) | null;
-};
-
-function speechCtor(): SpeechCtor | null {
-  if (typeof window === "undefined") return null;
-  const host = window as Window & { SpeechRecognition?: SpeechCtor; webkitSpeechRecognition?: SpeechCtor };
-  return host.SpeechRecognition ?? host.webkitSpeechRecognition ?? null;
-}
 
 const NAV = [
   { id: "home", label: "Home", icon: Radio },
@@ -68,11 +49,8 @@ export function Mission() {
   const [listening, setListening] = useState(false);
   const [busy, setBusy] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
-  const recognition = useRef<InstanceType<SpeechCtor> | null>(null);
   const audio = useRef<HTMLAudioElement | null>(null);
-  const holding = useRef(false);
-  const heard = useRef("");
-  const sentUtterance = useRef(false);
+  const recorder = useRef<MediaRecorder | null>(null);
 
   useEffect(() => {
     void Promise.resolve(useMission.persist.rehydrate()).finally(() => markHydrated());
@@ -149,70 +127,65 @@ export function Mission() {
     }
   }
 
-  function holdStart(event: PointerEvent<HTMLButtonElement>) {
+  async function holdStart(event: PointerEvent<HTMLButtonElement>) {
     event.preventDefault();
-    const Ctor = speechCtor();
-    if (!Ctor) {
-      setError("This browser has no speech recognition. Type instead.");
+    if (listening || busy) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      setError("Microphone did not start.");
       return;
     }
-    event.currentTarget.setPointerCapture(event.pointerId);
-    holding.current = true;
-    heard.current = "";
-    sentUtterance.current = false;
-    const rec = new Ctor();
-    rec.lang = "en-US";
-    rec.interimResults = true;
-    rec.continuous = true;
-    rec.onresult = (resultEvent) => {
-      let text = "";
-      for (let index = 0; index < resultEvent.results.length; index += 1) {
-        text += resultEvent.results[index]?.[0]?.transcript ?? "";
-      }
-      const shown = text.trim();
-      if (!shown) return;
-      heard.current = shown;
-      setDraft(shown);
+    const mime = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";
+    const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+    const chunks: Blob[] = [];
+    rec.ondataavailable = (clip) => {
+      if (clip.data.size) chunks.push(clip.data);
     };
-    rec.onerror = () => {
-      if (holding.current) return;
-      setListening(false);
-      setPhase("Idle");
+    rec.onstop = () => {
+      stream.getTracks().forEach((track) => track.stop());
+      const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
+      void finishClip(blob);
     };
-    rec.onend = () => {
-      if (holding.current) {
-        try {
-          rec.start();
-        } catch {
-          setListening(false);
-        }
-        return;
-      }
-      setListening(false);
-      setPhase((currentPhase) => (currentPhase === "Listening" ? "Idle" : currentPhase));
-      const said = heard.current.trim();
-      heard.current = "";
-      if (!said || sentUtterance.current) return;
-      sentUtterance.current = true;
-      void send(said);
-    };
-    recognition.current = rec;
+    recorder.current = rec;
     setListening(true);
     setPhase("Listening");
     setError("");
-    try {
-      rec.start();
-    } catch {
-      holding.current = false;
-      setListening(false);
-      setError("Microphone did not start.");
+    rec.start();
+  }
+
+  async function finishClip(blob: Blob) {
+    setListening(false);
+    if (!blob.size) {
+      setPhase("Idle");
+      return;
     }
+    setPhase("Thinking");
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    let binary = "";
+    for (let index = 0; index < bytes.length; index += 0x8000) {
+      binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
+    }
+    const result = await transcribeClip({ data: { audio: btoa(binary), mime: blob.type || "audio/webm" } });
+    if (!result.ok) {
+      setError(result.error);
+      setPhase("Idle");
+      return;
+    }
+    if (!result.text.trim()) {
+      setError("Didn't catch that.");
+      setPhase("Idle");
+      return;
+    }
+    void send(result.text);
   }
 
   function holdStop() {
-    holding.current = false;
-    recognition.current?.stop();
-    setListening(false);
+    const rec = recorder.current;
+    if (rec && rec.state === "recording") rec.stop();
+    else setListening(false);
   }
 
   const current = agentByKey(agent);
