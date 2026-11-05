@@ -28,6 +28,7 @@
     <main id="main-content" tabindex="-1">
       <section id="home" class="view active">
         <div class="workspace-head"><h1>Conversation</h1><button class="quiet-button" id="new-thread">New thread</button></div>
+        <div class="home-split">
         <section class="voice-panel card" aria-label="Voice interface">
           <div class="orb-stage"></div><button id="orb" class="record-button" aria-label="Start listening">◉ <span>Microphone</span></button><div id="model-runtime" class="model-runtime" role="status" aria-live="polite">Model · checking</div>
           <div class="voice-guidance"><strong id="phase-label">Ready</strong><span id="voice-context">Default agent · Push to Talk</span><span class="shortcut-hint">Hold <kbd>Space</kbd> to speak · <kbd>Esc</kbd> to cancel</span></div>
@@ -35,6 +36,7 @@
           <div class="mode-control"><button id="mode-toggle" class="mode-toggle" aria-label="Talk mode" aria-haspopup="true" aria-expanded="false" aria-controls="mode-menu"><span id="mode-label">Push to Talk</span><span aria-hidden="true">⌄</span></button><div id="mode-menu" class="mode-menu" hidden><button class="mode active" data-mode="ptt" aria-pressed="true">Push to Talk</button><button class="mode" data-mode="tap" aria-pressed="false">Tap to Talk</button><button class="mode" data-mode="always" aria-pressed="false">Always On</button></div></div>
         </section>
         <section class="conversation-panel card" aria-label="Conversation"><div class="conversation-thread" id="conversation-thread" role="log" aria-live="polite"><div class="empty-thread" id="empty-thread"><strong>Your conversation starts here</strong><span>Hold Space or press the microphone to speak.</span></div></div><div class="transcript-line" id="transcript-line" hidden><span id="transcript"></span></div><form id="home-compose" class="home-compose"><label class="sr-only" for="home-message">Message assistant</label><input id="home-message" aria-label="Message assistant" placeholder="Type a message instead…" maxlength="10000"><button id="home-send" aria-label="Send message">Send</button></form></section>
+        </div>
       </section>
       <section id="agents" class="view"><div class="workspace-head"><div><p class="eyebrow">ROUTING</p><h1>Agents</h1></div></div><div id="agent-list" class="agent-grid"></div></section>
       <section id="comms" class="view"><div class="workspace-head"><div><p class="eyebrow">TEXT FALLBACK</p><h1>Comms</h1></div></div><section class="card compose-card"><label for="message" class="eyebrow">MESSAGE</label><textarea id="message" rows="5" placeholder="Send a text request to the selected agent..."></textarea><div class="compose-actions"><button id="send" class="primary-button">Send message</button><button id="dictation-pause" class="quiet-button">Pause dictation</button><a class="quiet-button" href="/upload">Upload fallback</a></div><pre id="reply" class="reply"></pre></section></section>

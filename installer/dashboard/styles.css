@@ -34,3 +34,33 @@ button{min-height:44px}.service-indicator{width:44px;height:44px}.service-action
 body,.topbar{background:#020202}.rail,.drawer{background:#080808}.voice-panel{height:410px;background:#050505}.orb-stage{height:340px;display:block}.orb-stage:before,.orb-stage:after{display:none}.orb-stage canvas{width:100%;height:100%;display:block}.field-node{position:absolute;text-align:left;background:#080808;border:1px solid #303030;padding:7px 10px;color:#d3d3d3;border-radius:3px;font-size:11px;min-height:42px;min-width:90px}.field-node small{display:block;color:#999;margin-top:4px;font-size:9px}.field-node.active{border-color:#a75a31;color:#d58a60}.field-node.error{border-color:#713b35}.field-node.error small{color:#c56b60}.record-button{position:absolute;bottom:51px;left:18px;border:1px solid #454545;background:#111;color:#ccc;border-radius:4px;padding:9px 12px;min-height:40px}.record-button.is-listening{color:#d38b63;border-color:#ac633b}.field-node:focus-visible,.record-button:focus-visible{outline:2px solid #d18a60;outline-offset:3px}
 @media(max-width:700px){.voice-panel{height:390px}.orb-stage{height:310px}.field-node{min-width:72px;padding:5px;font-size:10px}.record-button{left:10px}.field-node small{max-width:80px;overflow-wrap:anywhere}}
 .voice-guidance{position:absolute;left:18px;right:18px;bottom:93px;display:flex;align-items:center;gap:12px;color:#b2b2b2;font-size:11px}.voice-guidance strong{color:#e4a67b;font-size:13px}.shortcut-hint{margin-left:auto;color:#aaa}.shortcut-hint kbd{border:1px solid #4a4a4a;border-radius:3px;padding:2px 5px;color:#ddd;background:#111;font:10px ui-monospace,monospace}.empty-thread{display:grid;gap:8px;place-items:center;min-height:120px;color:#aaa;text-align:center}.empty-thread strong{color:#e0e0e0;font-size:15px}.empty-thread span{font-size:12px}.message.user{max-width:78%;margin-left:auto;padding:11px 14px;border:1px solid #433328;border-radius:8px;background:#28221e}.message.assistant{max-width:82%;padding:11px 14px;border:1px solid #2d3032;border-radius:8px;background:#17191b}.message.system{padding:11px 14px;border:1px solid #713b35;border-radius:8px}.home-compose button{min-width:64px;font-size:11px}@media(max-width:700px){.voice-guidance{left:10px;right:10px;bottom:87px;display:grid;gap:4px}.shortcut-hint{margin-left:0}.empty-thread{min-height:100px}}
+
+/* Orb console laid over the existing dashboard. */
+:root { --bg:#000; --panel:#000; --orange:#c43218; --line:#1e293b; --muted:#94a3b8; --text:#e8eef3; }
+html, body { height:100%; background:#000; overflow:hidden; }
+.topbar { margin-left:208px; height:48px; background:#000; border-bottom:1px solid #1e293b; }
+.app-shell { margin-left:208px; min-height:calc(100dvh - 48px); background:#000; }
+.rail { width:208px; background:color-mix(in srgb, #94a3b8 8%, #000); border-right:1px solid #33415555; }
+.rail-link.active { background:transparent; color:#e8eef3; box-shadow:inset 2px 0 0 #c43218; }
+main { max-width:none; height:calc(100dvh - 48px); padding:0; }
+#home .workspace-head { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); }
+#home.view.active { display:flex; flex-direction:column; height:100%; }
+.home-split { display:flex; flex:1; min-height:0; }
+.voice-panel { flex:1; height:auto; min-height:0; border:0; border-radius:0; background:radial-gradient(circle at 50% 46%, #94a3b829, #000 48%); }
+.orb-stage { height:100%; }
+.orb-stage canvas { width:100%; height:100%; display:block; }
+.record-button { left:16px; bottom:16px; background:#94a3b814; border:1px solid #cbd5e133; color:#e8eef3; }
+.record-button.is-listening { color:#c43218; border-color:#c43218; }
+.voice-guidance { left:16px; top:16px; bottom:auto; right:auto; }
+.shortcut-hint, #voice-context { display:none; }
+.conversation-panel { width:380px; margin:12px; max-height:calc(100% - 24px); display:flex; flex-direction:column; background:#94a3b814; border:1px solid #cbd5e122; border-radius:12px; }
+.conversation-thread { flex:1; max-height:none; }
+.message.user { background:transparent; border-color:#cbd5e133; }
+.message.assistant { background:#94a3b80f; border-color:#cbd5e122; }
+.home-compose button { background:#c43218; border-color:#c43218; color:#000; }
+@media (max-width:700px) {
+  .topbar, .app-shell { margin-left:64px; }
+  .home-split { flex-direction:column; }
+  .voice-panel { height:46dvh; }
+  .conversation-panel { width:auto; max-height:none; flex:1; }
+}
