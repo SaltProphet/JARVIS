@@ -62,11 +62,12 @@ function createLayeredField() {
     const box = host.getBoundingClientRect();
     width = box.width;
     height = box.height;
-    const ratio = Math.min(devicePixelRatio || 1, 2);
+    const ratio = Math.min(globalThis.devicePixelRatio || 1, 2);
     canvas.width = width * ratio;
     canvas.height = height * ratio;
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     draw();
+    if (!frame) frame = requestAnimationFrame(loop);
   }
 
   function draw() {
@@ -124,7 +125,7 @@ function createLayeredField() {
   function loop(time) {
     if (frame) cancelAnimationFrame(frame);
     frame = 0;
-    if (document.hidden) return;
+    if (document.hidden || !width) return;
     if (!reduce.matches) turn += 0.006;
     if (time - last > 32) {
       draw();
@@ -134,8 +135,8 @@ function createLayeredField() {
   }
 
   new ResizeObserver(size).observe(host);
-  document.addEventListener("visibilitychange", () => loop(performance.now()));
-  reduce.addEventListener("change", () => draw());
-  size();
-  loop(performance.now());
+  document.addEventListener("visibilitychange", () => loop(0));
+  reduce.addEventListener("change", () => {
+    if (width) draw();
+  });
 }

@@ -51,6 +51,9 @@ export function Mission() {
   const scroller = useRef<HTMLDivElement>(null);
   const audio = useRef<HTMLAudioElement | null>(null);
   const recorder = useRef<MediaRecorder | null>(null);
+  const pointerDown = useRef(false);
+  const releaseTimer = useRef(0);
+  const clipSent = useRef(false);
 
   useEffect(() => {
     void Promise.resolve(useMission.persist.rehydrate()).finally(() => markHydrated());
@@ -129,27 +132,38 @@ export function Mission() {
 
   async function holdStart(event: PointerEvent<HTMLButtonElement>) {
     event.preventDefault();
-    if (listening || busy) return;
+    pointerDown.current = true;
+    window.clearTimeout(releaseTimer.current);
+    if (recorder.current?.state === "recording" || listening) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
+      pointerDown.current = false;
       setError("Microphone did not start.");
+      return;
+    }
+    if (!pointerDown.current) {
+      stream.getTracks().forEach((track) => track.stop());
       return;
     }
     const mime = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";
     const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
     const chunks: Blob[] = [];
+    let ended = false;
     rec.ondataavailable = (clip) => {
       if (clip.data.size) chunks.push(clip.data);
     };
     rec.onstop = () => {
+      if (ended) return;
+      ended = true;
       stream.getTracks().forEach((track) => track.stop());
       const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
       void finishClip(blob);
     };
     recorder.current = rec;
+    clipSent.current = false;
     setListening(true);
     setPhase("Listening");
     setError("");
@@ -157,7 +171,10 @@ export function Mission() {
   }
 
   async function finishClip(blob: Blob) {
+    if (clipSent.current) return;
+    clipSent.current = true;
     setListening(false);
+    recorder.current = null;
     if (!blob.size) {
       setPhase("Idle");
       return;
@@ -183,9 +200,14 @@ export function Mission() {
   }
 
   function holdStop() {
-    const rec = recorder.current;
-    if (rec && rec.state === "recording") rec.stop();
-    else setListening(false);
+    pointerDown.current = false;
+    window.clearTimeout(releaseTimer.current);
+    releaseTimer.current = window.setTimeout(() => {
+      if (pointerDown.current) return;
+      const rec = recorder.current;
+      if (rec && rec.state === "recording") rec.stop();
+      else setListening(false);
+    }, 180);
   }
 
   const current = agentByKey(agent);
@@ -312,9 +334,7 @@ export function Mission() {
                 aria-label={listening ? "Stop listening" : "Hold to talk"}
                 onPointerDown={holdStart}
                 onPointerUp={holdStop}
-                onPointerLeave={() => {
-                  if (listening) holdStop();
-                }}
+                onPointerCancel={holdStop}
                 className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-md px-3 ${listening ? "bg-teal text-ink" : "glass text-bone"}`}
               >
                 <Mic className="size-4" aria-hidden="true" />
